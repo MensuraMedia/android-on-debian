@@ -21,8 +21,13 @@ _fetch() {
   echo "$dir"
 }
 
+# Skill profiles kept in the repo, e.g. the project's flat dark diagram style.
+# shortcut: only diagram-design has profiles; generalise the target dir if another skill adds them.
+_profiles_src() { echo "$ADX_ROOT/config/skill-profiles/diagram-design"; }
+_profiles_dst() { echo "$HOME/.diagram-design/profiles"; }
+
 mod_status() {
-  local rc=0 name repo sha path
+  local rc=0 name repo sha path f
   while read -r name repo sha path; do
     if [ -d "$(_cache)/${repo//\//__}@$sha/$path" ]; then
       echo "cached  $name ($repo@${sha:0:12})"
@@ -30,6 +35,10 @@ mod_status() {
       echo "missing $name ($repo@${sha:0:12})"; rc=1
     fi
   done < <(_rows)
+  for f in "$(_profiles_src)"/*.md; do
+    if cmp -s "$f" "$(_profiles_dst)/$(basename "$f")"; then echo "profile $(basename "$f" .md): installed"
+    else echo "profile $(basename "$f" .md): missing or changed (adx skills install)"; rc=1; fi
+  done
   return $rc
 }
 
@@ -40,6 +49,9 @@ mod_install() {
     adx_log "fetching $name"
     _fetch "$repo" "$sha" >/dev/null
   done < <(_rows)
+  mkdir -p "$(_profiles_dst)"
+  cp "$(_profiles_src)"/*.md "$(_profiles_dst)/"
+  adx_log "installed skill profiles into $(_profiles_dst)"
 }
 
 # Vendor skills into <dir>/.claude/skills/ and write a lock file:

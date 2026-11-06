@@ -6,6 +6,21 @@ the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `diagram-design` skill (cathrynlavery/diagram-design, pinned f24d98b) for
+  documentation diagrams; project profile `aod-flat-dark`
+  (`config/skill-profiles/diagram-design/`, installed to `~/.diagram-design/profiles/`
+  by the skills module, selected by the `.diagram-design` marker, also in the app
+  template). All project diagrams are flat dark, system fonts, WCAG-checked tokens.
+- `docs/diagrams/aodm-architecture.{html,svg}`: architecture of the planned phone
+  image manager.
+- `docs/research/aodm-spike.md`: what the emulator really allows (settings,
+  boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
+
+### Changed
+- Vendored skills in the framework repo are git-ignored (`adx skills apply .`
+  recreates them from the pinned manifest).
+
 ## [0.2.0] - 2026-11-06
 
 ### Added
