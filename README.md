@@ -185,6 +185,7 @@ docs/                    architecture, environment, dependencies, install issues
                          troubleshooting, skills, Android Studio, research
 CHANGELOG.md             notable changes (Keep a Changelog format)
 HANDOFF.md               current state, open items, next steps
+ROADMAP.md               shipped, pending and future features
 ```
 
 ## Extending

@@ -6,7 +6,22 @@ the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
+
+### Planned for 0.3.0 (approved, not yet built)
+- `aodm` phone image manager (Rust, CLI + TUI): inventory, lifecycle for one,
+  a group or all images, full-copy saves, clone/rename/delete, groups, bulk
+  settings profiles, bulk app deploy, broadcast/capture, health and version card.
+- Build templates with a built-in `barebones` default; identity policies
+  (`private`/`standard`/`fixed`); per-image security locks; spin-offs into
+  standalone phones (`aod-phone`) with a calls/SMS switchboard.
+- Change pipeline: `adx check` gate, `devtools` module, `deploy-reviewer`
+  agent, `review-change` workflow, `adx release`, `adx upgrade` with rollback.
+- Technical document `docs/phone-image-manager.md` with flat dark diagrams.
+
 ### Added
+- `ROADMAP.md`: shipped, pending (in progress, planned, decision needed) and
+  future features in one place.
 - `diagram-design` skill (cathrynlavery/diagram-design, pinned f24d98b) for
   documentation diagrams; project profile `aod-flat-dark`
   (`config/skill-profiles/diagram-design/`, installed to `~/.diagram-design/profiles/`

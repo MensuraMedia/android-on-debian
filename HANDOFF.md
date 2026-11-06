@@ -3,6 +3,7 @@
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
 Full environment reference: [docs/environment.md](docs/environment.md).
+Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## State
 
