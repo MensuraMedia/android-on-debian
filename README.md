@@ -10,6 +10,14 @@ app, screens render to PNG on the JVM in seconds with **Roborazzi**, and run on
 a headless **official Android Emulator** driven by **mobile-mcp** when you need
 live behaviour.
 
+<p align="center">
+  <img src="docs/examples/meridian-weather/mockups/03_map_picker.png" alt="Meridian Weather's Pick places screen: a dot-matrix world map with New York, Reykjavík, London and Cape Town selected, chips for five selected cities, and a Save selection button" width="320">
+</p>
+<p align="center">
+  <em>The Pick places screen of <a href="docs/examples/meridian-weather/">Meridian Weather</a>, the first app built with this framework.<br>
+  It was rendered on the JVM by Roborazzi straight from the Compose code, with no emulator.</em>
+</p>
+
 ## Purpose
 
 Android development on Linux usually starts with a 1.6 GB IDE and a GUI setup
