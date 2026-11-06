@@ -6,6 +6,15 @@ Read `README.md`, `docs/architecture.md` and `HANDOFF.md` first.
 
 ## Rules
 
+- **Modular, then minimal.** Follow the modularity rules in
+  `docs/architecture.md` (one capability per module, contract only, config in
+  one place, small core). Inside a module, use the ponytail skill
+  (`/ponytail`): the smallest complete change, no speculative options, mark
+  known limits with `shortcut: <limit>, <when to upgrade>`. Audit with
+  `/ponytail-audit`, list shortcuts with `/ponytail-debt` (skills are vendored
+  into apps; in this repo run `adx skills apply .` first if you want them).
+- Before calling a change done, run the `adversarial-reviewer` agent on the
+  segment you touched and fix or record what it finds.
 - Each capability lives in `modules/<name>/module.sh` and follows the module
   contract (`MOD_DESC`, `mod_status`, `mod_install`, optional `mod_<verb>`).
   Never hard-code versions or paths in modules; add them to
@@ -26,4 +35,6 @@ Read `README.md`, `docs/architecture.md` and `HANDOFF.md` first.
 | Status of everything | `./adx list` / `./adx doctor` |
 | Provision | `./adx up [profile]` |
 | New app | `./adx app-template new <Name> <package> [dir]` |
-| Emulator | `./adx emulator start|stop|screenshot|accel` |
+| Emulator | `./adx emulator start [--window] [--wipe]`, `stop`, `status`, `autoconfig`, `desktop`, `screenshot`, `accel` |
+| Logs | `./adx logs [adx\|emulator\|dir] [-n N]` (files in `~/.local/state/adx/`) |
+| Machine report | `./adx env` |

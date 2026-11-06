@@ -51,12 +51,14 @@ extended module by module.
 ```bash
 git clone https://github.com/MensuraMedia/android-on-debian.git
 cd android-on-debian
+./adx system status      # preflight: prints the one sudo command if anything is missing
+sudo usermod -aG kvm $USER   # once, then log out and back in (KVM for the emulator)
 ./adx up                 # provision everything in profiles/default.profile
 exec bash                # reload ~/.bashrc (adds ANDROID_HOME, PATH, adx)
 
 adx app-template new HelloApp com.example.helloapp
 cd ~/projects/android-apps/HelloApp
-./gradlew recordRoborazziDebug          # PNGs in app/build/outputs/roborazzi/
+./gradlew recordRoborazziDebug          # PNGs in app/src/test/screenshots/ (committed baselines)
 
 adx emulator start                      # headless API 37 emulator (KVM)
 ./gradlew installDebug
@@ -74,8 +76,8 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 | CPU | x86_64 with VT-x/AMD-V | Needed for emulator acceleration |
 | RAM | 16 GB recommended | Emulator + Gradle daemon |
 | Disk | ~15 GB | SDK, system image, Gradle caches |
-| Base tools | `bash curl wget unzip git jq perl` | Usually preinstalled |
-| Node.js | 18+ with `npx` | Only for mobile-mcp; `adx up` stops at that module without it (user-level install: see [troubleshooting](docs/troubleshooting.md)) |
+| Base tools | `bash curl wget unzip tar xz-utils coreutils git jq perl gawk procps` (+ `pciutils`, `libnotify-bin`, `desktop-file-utils` recommended) | Usually preinstalled; `./adx system status` prints the exact `apt-get` line. Full list: [docs/dependencies.md](docs/dependencies.md) |
+| Node.js | 20+ with `npx` | Only for mobile-mcp; installed at user level by the `node` module if missing |
 | Claude Code | `claude` CLI | For the MCP server, skills and permissions |
 | KVM | read/write access to `/dev/kvm` | `sudo usermod -aG kvm $USER`, then log out and back in |
 
@@ -83,13 +85,16 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 
 | Module | Installs | Location |
 | --- | --- | --- |
+| `system` | Nothing: preflight of apt packages, CPU virtualisation, KVM, RAM, disk; prints the one `sudo` command needed | — |
 | `jdk` | Eclipse Temurin 21 JDK (SHA-256 verified) | `~/.local/opt/jdk-21` |
 | `shell-env` | Managed `~/.bashrc` block: `ANDROID_HOME`, `JAVA_HOME`, PATH | `~/.bashrc` → `lib/shell-env.sh` |
 | `sdk` | cmdline-tools, platform-tools, platform 37.0, build-tools 37.0.0 | `~/Android/Sdk` |
-| `emulator` | Emulator + API 37 Google Play x86_64 image + AVD `adx_api37` | `~/Android/Sdk`, `~/.android/avd` |
+| `emulator` | Emulator + API 37 Google Play x86_64 image + AVD `adx_api37`; GPU settings auto-configured on hybrid laptops | `~/Android/Sdk`, `~/.android/avd` |
 | `gradle` | Gradle 9.8.2, used only to generate app wrappers | `~/.local/opt/gradle` |
+| `node` | Node.js 26 LTS for mobile-mcp (SHA-256 verified), if missing or too old | `~/.local/opt/node`, `~/.local/bin` |
 | `mobile-mcp` | `@mobilenext/mobile-mcp` registered in Claude Code | `~/.claude.json` (user scope) |
 | `claude-permissions` | Permission allowlist template | `<project>/.claude/settings.json` |
+| `claude-rules` | Global rules (changelog, handoff, logging) and the `adversarial-reviewer` agent | `~/.claude/CLAUDE.md` block, `~/.claude/agents/` |
 | `skills` | Pinned design and code skills (below) | `<app>/.claude/skills/` |
 | `app-template` | Compose + Roborazzi app scaffolder | `~/projects/android-apps/<Name>` |
 | `studio` | Nothing; reports on the dormant Android Studio install | `~/.local/opt/android-studio` |
@@ -102,6 +107,8 @@ adx doctor                       detailed status of every module
 adx up [profile]                 install every module in a profile (default: default)
 adx <module> [action] [args...]  run one module action (default: status)
 adx <module> help                list a module's actions
+adx env                          versions, paths and machine facts
+adx logs [adx|emulator|dir] [-n N]  framework / emulator logs (~/.local/state/adx/)
 ```
 
 Common actions:
@@ -109,7 +116,10 @@ Common actions:
 | Command | Effect |
 | --- | --- |
 | `adx app-template new <Name> <package> [dir]` | Scaffold an app (permissions, skills, wrapper, git init) |
-| `adx emulator start [--window] [--wipe]` / `stop` | Boot or stop the AVD (headless unless `--window`; `--wipe` factory-resets its data) |
+| `adx emulator start [--window] [--wipe]` / `stop` | Boot or stop the AVD (headless unless `--window`; `--wipe` factory-resets its data; reattaches adb if it lost a running emulator) |
+| `adx emulator status` | Process, adb state, GPU mode, crash and hybrid-GPU hints, menu entry |
+| `adx emulator autoconfig` | Detect hybrid GPUs and write safe emulator settings to `config/local.env` |
+| `adx emulator desktop [remove]` | Menu entry Programming → Android Emulator (Stop / Start with wiped data actions) |
 | `adx emulator screenshot [file]` | Save the emulator screen to a PNG |
 | `adx emulator accel` | Check KVM acceleration |
 | `adx sdk add "platforms;android-36"` | Install extra SDK packages |
@@ -134,14 +144,18 @@ Profiles in `profiles/` choose which modules `adx up` installs.
    on a device matrix such as Firebase Test Lab's free tier. Neither is
    automated here yet.
 
-See [docs/architecture.md](docs/architecture.md) for the diagram and module contract.
+See [docs/architecture.md](docs/architecture.md) for the diagram, module contract and
+modularity rules, [docs/environment.md](docs/environment.md) for the full environment
+reference (paths, logs, Claude integration, recovery), [docs/dependencies.md](docs/dependencies.md)
+for every dependency, and [docs/install-issues.md](docs/install-issues.md) for every
+installation issue met so far.
 
 ## UI/UX and code-quality resources
 
 Every scaffolded app gets these Claude Code skills in `.claude/skills/`,
 pinned to exact commits in [`config/skills.manifest`](config/skills.manifest).
 Only the skills themselves are installed. The upstream plugins' automatic
-hooks are deliberately left out, so nothing runs unless a skill is invoked.
+hooks are deliberately left out, so no hooks run on their own. Claude may still load a skill automatically when its description matches the task.
 Details are in [docs/skills.md](docs/skills.md).
 
 | Resource | Skills | Role in this framework | Source |
@@ -166,7 +180,8 @@ config/skills.manifest   pinned third-party skills
 profiles/*.profile       ordered module lists for `adx up`
 modules/<name>/module.sh one capability each (see docs/architecture.md)
 templates/               app templates + Claude permission template
-docs/                    architecture, skills, Android Studio, troubleshooting, research
+docs/                    architecture, environment, dependencies, install issues,
+                         troubleshooting, skills, Android Studio, research
 CHANGELOG.md             notable changes (Keep a Changelog format)
 HANDOFF.md               current state, open items, next steps
 ```

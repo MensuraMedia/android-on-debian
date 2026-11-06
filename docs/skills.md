@@ -28,7 +28,7 @@ with automatic hooks:
   is off by default.
 
 The decision taken on 2026-11-05 was to install **only the SKILL.md skills**.
-They run only when invoked. Their bundled scripts can still be called by the
+No hooks are installed, so nothing runs on its own; Claude may still load a skill automatically when its description matches the task. Their bundled scripts can still be called by the
 skill through Bash, and those calls go through Claude Code's normal
 permission prompts.
 

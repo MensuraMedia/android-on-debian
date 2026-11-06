@@ -11,7 +11,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Screenshot tests: `./gradlew recordRoborazziDebug` writes PNGs to
- * app/build/outputs/roborazzi/, `verifyRoborazziDebug` fails on visual diffs.
+ * app/src/test/screenshots/ (committed baselines), `verifyRoborazziDebug` fails on visual diffs.
  * Add one @Test per screen/state you want rendered.
  */
 @RunWith(AndroidJUnit4::class)
@@ -21,14 +21,14 @@ class HomeScreenScreenshotTest {
 
     @Test
     fun homeScreen_light() {
-        captureRoboImage("build/outputs/roborazzi/HomeScreen_light.png") {
+        captureRoboImage("src/test/screenshots/HomeScreen_light.png") {
             AppTheme(darkTheme = false) { HomeScreen() }
         }
     }
 
     @Test
     fun homeScreen_dark() {
-        captureRoboImage("build/outputs/roborazzi/HomeScreen_dark.png") {
+        captureRoboImage("src/test/screenshots/HomeScreen_dark.png") {
             AppTheme(darkTheme = true) { HomeScreen(initialCount = 3) }
         }
     }

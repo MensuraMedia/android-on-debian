@@ -35,7 +35,7 @@ mod_new() {
     # Generate the wrapper in an empty dir so the new project isn't configured yet.
     local w; w="$(mktemp -d)"
     : > "$w/settings.gradle.kts"
-    ( cd "$w" && adx_run_module gradle run wrapper --gradle-version "$ADX_GRADLE_VERSION" --distribution-type bin -q )
+    ( cd "$w" && adx_run_module gradle run wrapper --gradle-version "$ADX_GRADLE_VERSION" --distribution-type bin --gradle-distribution-sha256-sum "$ADX_GRADLE_SHA256" -q )
     cp -r "$w/gradlew" "$w/gradlew.bat" "$w/gradle" "$dest/"
     rm -rf "$w"
   else

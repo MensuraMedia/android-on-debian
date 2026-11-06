@@ -3,10 +3,12 @@
 # Android development on Debian-family Linux. See README.md.
 #
 #   adx list                         modules, descriptions and status
-#   adx doctor                       status of every module (non-zero if any fail)
+#   adx doctor [profile]             status of every module (non-zero if a profile module fails)
 #   adx up [profile]                 install every module in a profile (default: default)
 #   adx <module> [action] [args...]  run one module action (default action: status)
 #   adx <module> help                actions a module provides
+#   adx env                          versions, paths and machine facts (for docs/bug reports)
+#   adx logs [adx|emulator|dir] [-n N]  framework or emulator log (default: adx, 40 lines)
 set -euo pipefail
 
 ADX_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -14,9 +16,74 @@ export ADX_ROOT
 # shellcheck source=lib/common.sh
 . "$ADX_ROOT/lib/common.sh"
 adx_load_config
+# User-level tools (node, npx, claude) live here; ~/.profile only adds it if it existed at login.
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
+export PATH
+
+# Framework log: one START and one END line per invocation, plus every
+# adx_log/adx_warn/adx_die message in between (see lib/common.sh).
+ADX_RUN_ID="$$"
+export ADX_RUN_ID
+adx_log_rotate "$ADX_LOG_DIR/adx.log" 2>/dev/null || true
+adx_logfile START "adx $* (cwd: $PWD)"
+trap 'adx_logfile END "exit $?"' EXIT
 
 adx_usage() {
-  sed -n '2,10p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
+  sed -n '2,11p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
+}
+
+adx_cmd_logs() {
+  local which=adx n=40
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -n) [ -n "${2:-}" ] || adx_die "-n needs a number"; n="$2"; shift 2 ;;
+      *)  which="$1"; shift ;;
+    esac
+  done
+  case "$which" in
+    adx|emulator)
+      local f="$ADX_LOG_DIR/adx.log"
+      [ "$which" = emulator ] && f="$ADX_LOG_DIR/emulator-$ADX_AVD_NAME.log"
+      [ -f "$f" ] || adx_die "no log yet: $f"
+      tail -n "$n" "$f" ;;
+    dir)      echo "$ADX_LOG_DIR"; ls -la "$ADX_LOG_DIR" ;;
+    *)        adx_die "usage: adx logs [adx|emulator|dir] [-n N]" ;;
+  esac
+}
+
+adx_cmd_env() {
+  local v
+  _ver() { "$@" 2>&1 | head -1; }
+  echo "# adx environment report — $(date '+%Y-%m-%d %H:%M')"
+  echo
+  echo "## Machine"
+  echo "os:        $(. /etc/os-release; echo "$PRETTY_NAME")"
+  echo "kernel:    $(uname -r)"
+  echo "cpu:       $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //') ($(nproc) threads)"
+  echo "ram:       $(free -g | awk '/^Mem:/{print $2" GiB"}')"
+  echo "desktop:   ${XDG_CURRENT_DESKTOP:-?} on ${XDG_SESSION_TYPE:-?}"
+  echo "gpus:      $(lspci 2>/dev/null | grep -iE 'vga|3d' | sed 's/^.*: //' | paste -sd ';' | sed 's/;/; /g')"
+  adx_have prime-select && echo "prime:     $(prime-select query 2>/dev/null)"
+  echo "kvm:       $([ -r /dev/kvm ] && [ -w /dev/kvm ] && echo accessible || echo 'NOT accessible'); in kvm group (this session): $(id -nG | tr ' ' '\n' | grep -qx kvm && echo yes || echo no)"
+  echo
+  echo "## Toolchain"
+  echo "adx:       $ADX_ROOT ($(git -C "$ADX_ROOT" describe --always --dirty 2>/dev/null))"
+  echo "java:      $(_ver "$ADX_JAVA_HOME/bin/java" -version)"
+  echo "sdk:       $ANDROID_HOME"
+  echo "adb:       $(_ver "$ANDROID_HOME/platform-tools/adb" --version)"
+  echo "emulator:  $(_ver "$ANDROID_HOME/emulator/emulator" -version)"
+  echo "avd:       $ADX_AVD_NAME ($ADX_AVD_IMAGE, $ADX_AVD_DEVICE)"
+  echo "emu gpu:   $ADX_EMU_GPU; headless: $ADX_EMU_HEADLESS; env: ${ADX_EMU_ENV:-none}"
+  echo "gradle:    $ADX_GRADLE_VERSION (wrapper bootstrap); AGP $ADX_AGP_VERSION; Kotlin $ADX_KOTLIN_VERSION"
+  v="$(command -v node || true)"; echo "node:      ${v:-missing} $( [ -n "$v" ] && node --version)"
+  v="$(command -v claude || true)"; echo "claude:    ${v:-missing} $( [ -n "$v" ] && claude --version 2>/dev/null | head -1)"
+  echo "mobile-mcp: $ADX_MOBILE_MCP_VERSION (scope: $ADX_MCP_SCOPE)"
+  echo
+  echo "## Paths"
+  echo "apps:      $ADX_APPS_DIR"
+  echo "downloads: $ADX_DOWNLOADS"
+  echo "logs:      $ADX_LOG_DIR"
+  echo "overrides: $([ -f "$ADX_ROOT/config/local.env" ] && grep -E '^[A-Z_]+=' "$ADX_ROOT/config/local.env" | cut -d= -f1 | paste -sd ' ' || echo none)"
 }
 
 adx_cmd_list() {
@@ -29,11 +96,17 @@ adx_cmd_list() {
   done
 }
 
+# Shows every module; only modules in the profile (default: default) affect the exit code,
+# so optional ones like studio don't fail it.
 adx_cmd_doctor() {
-  local m rc=0
+  local m rc=0 profile="$ADX_ROOT/profiles/${1:-default}.profile"
+  [ -f "$profile" ] || adx_die "no profile '${1:-default}' (see profiles/)"
   for m in $(adx_modules); do
     printf '\n== %s ==\n' "$m"
-    adx_run_module "$m" status || rc=1
+    if adx_run_module "$m" status; then :
+    elif grep -qx "$m" "$profile"; then rc=1
+    else echo "(not in profile $(basename "$profile" .profile); ignored for the exit code)"
+    fi
   done
   return $rc
 }
@@ -43,21 +116,28 @@ adx_cmd_up() {
   file="$ADX_ROOT/profiles/$profile.profile"
   [ -f "$file" ] || adx_die "no profile '$profile' (see profiles/)"
   adx_log "profile: $profile"
-  for m in $(grep -vE '^\s*(#|$)' "$file"); do
+  local failed=""
+  for m in $(sed 's/#.*//' "$file"); do
     if adx_run_module "$m" status >/dev/null 2>&1; then
       adx_log "$m: already ok"
     else
       adx_log "$m: installing"
       adx_run_module "$m" install
+      if ! adx_run_module "$m" status >/dev/null 2>&1; then
+        adx_warn "$m: installed but status still fails (see: adx $m status)"; failed="$failed $m"
+      fi
     fi
   done
+  if [ -n "$failed" ]; then adx_die "profile '$profile' incomplete:$failed"; fi
   adx_log "profile '$profile' done"
 }
 
 case "${1:-}" in
   ""|-h|--help|help) adx_usage ;;
   list)   adx_cmd_list ;;
-  doctor) adx_cmd_doctor ;;
+  doctor) shift; adx_cmd_doctor "$@" ;;
   up)     shift; adx_cmd_up "$@" ;;
+  env)    adx_cmd_env ;;
+  logs)   shift; adx_cmd_logs "$@" ;;
   *)      m="$1"; shift; adx_run_module "$m" "${1:-status}" "${@:2}" ;;
 esac

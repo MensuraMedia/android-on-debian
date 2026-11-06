@@ -1,9 +1,46 @@
 # Shared helpers for adx and its modules. Sourced, never executed.
 
-adx_log()  { printf '\033[1;34m[adx]\033[0m %s\n' "$*"; }
-adx_warn() { printf '\033[1;33m[adx] warn:\033[0m %s\n' "$*" >&2; }
-adx_die()  { printf '\033[1;31m[adx] error:\033[0m %s\n' "$*" >&2; exit 1; }
+# Every message is shown on the terminal and appended, timestamped and without
+# colour, to the framework log: $ADX_LOG_DIR/adx.log (see docs/environment.md).
+adx_log()  { printf '\033[1;34m[adx]\033[0m %s\n' "$*"; adx_logfile INFO "$*"; }
+adx_warn() { printf '\033[1;33m[adx] warn:\033[0m %s\n' "$*" >&2; adx_logfile WARN "$*"; }
+adx_die()  { printf '\033[1;31m[adx] error:\033[0m %s\n' "$*" >&2; adx_logfile ERROR "$*"; exit 1; }
 adx_have() { command -v "$1" >/dev/null 2>&1; }
+
+# Append one line to the framework log: adx_logfile <LEVEL> <message...>
+# Never fails the caller (logging must not break a command).
+adx_logfile() {
+  local level="$1"; shift
+  [ -n "${ADX_LOG_DIR:-}" ] || return 0
+  {
+    mkdir -p "$ADX_LOG_DIR" &&
+    printf '%s %-5s [%s%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" \
+      "${MOD_NAME:-adx}" "${ADX_RUN_ID:+ #$ADX_RUN_ID}" "$*" >> "$ADX_LOG_DIR/adx.log"
+  } 2>/dev/null || true
+}
+
+# Keep a log file below ADX_LOG_MAX_KB by shifting it to <file>.1 ... <file>.N
+#   adx_log_rotate <file> [keep=ADX_LOG_KEEP]
+adx_log_rotate() {
+  local f="$1" keep="${2:-${ADX_LOG_KEEP:-5}}" i
+  [ -f "$f" ] || return 0
+  [ "$(du -k "$f" | cut -f1)" -ge "${ADX_LOG_MAX_KB:-5120}" ] || return 0
+  for ((i = keep - 1; i >= 1; i--)); do
+    [ -f "$f.$i" ] && mv -f "$f.$i" "$f.$((i + 1))"
+  done
+  mv -f "$f" "$f.1"
+}
+
+# Keep the previous run's log of a long-running process (e.g. the emulator),
+# so a crash log survives the next start: <file> -> <file>.1 ... <file>.N
+adx_log_shift() {
+  local f="$1" keep="${2:-${ADX_LOG_KEEP:-5}}" i
+  [ -f "$f" ] || return 0
+  for ((i = keep - 1; i >= 1; i--)); do
+    [ -f "$f.$i" ] && mv -f "$f.$i" "$f.$((i + 1))"
+  done
+  mv -f "$f" "$f.1"
+}
 
 # Load config/defaults.env, then config/local.env (machine overrides, git-ignored).
 adx_load_config() {
@@ -56,7 +93,7 @@ adx_download() {
 # Verify a file's SHA-256 if an expected hash is given (empty = skip).
 adx_sha256_check() {
   [ -z "${2:-}" ] && return 0
-  echo "$2  $1" | sha256sum -c --quiet - || adx_die "checksum mismatch for $1"
+  echo "$2  $1" | sha256sum -c --quiet - || { rm -f "$1"; adx_die "checksum mismatch for $1 (deleted; rerun to download again)"; }
 }
 
 # Write or replace a marked block in a file:
@@ -72,7 +109,7 @@ adx_block_write() {
 adx_block_remove() {
   local file="$1" name="$2"
   [ -f "$file" ] || return 0
-  sed -i "/^# >>> adx:$name >>>\$/,/^# <<< adx:$name <<<\$/d" "$file"
+  sed -i --follow-symlinks "/^# >>> adx:$name >>>\$/,/^# <<< adx:$name <<<\$/d" "$file"
 }
 
 adx_block_present() {
@@ -95,4 +132,15 @@ adx_render_tree() {
     fi
     if [ -x "$src/$rel" ]; then chmod +x "$out"; fi
   done
+}
+
+# Set KEY="value" in config/local.env unless the user already set KEY there.
+# Returns 0 if it wrote the value, 1 if KEY was already present.
+#   adx_local_set <KEY> <value> <comment>
+adx_local_set() {
+  local f="$ADX_ROOT/config/local.env"
+  grep -qE "^[[:space:]]*(export[[:space:]]+)?$1=" "$f" 2>/dev/null && return 1
+  [ -f "$f" ] || printf '# Machine overrides (git-ignored). See config/local.env.example.\n' > "$f"
+  printf '\n# %s (set by adx on %s)\n%s=%q\n' "$3" "$(date +%F)" "$1" "$2" >> "$f"
+  adx_logfile INFO "local.env: $1=\"$2\""
 }

@@ -24,6 +24,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true // AppLog: debug/info logs only in debug builds
     }
 
     testOptions {

@@ -25,7 +25,8 @@ mod_apply() {
     jq -s '.[0] * {permissions: {
               allow: ((.[0].permissions.allow // []) + .[1].permissions.allow | unique),
               ask:   ((.[0].permissions.ask   // []) + .[1].permissions.ask   | unique)}}' \
-       "$f" "$(_tpl)" > "$f.tmp" && mv "$f.tmp" "$f"
+       "$f" "$(_tpl)" > "$f.tmp" || { rm -f "$f.tmp"; adx_die "cannot merge into $f (invalid JSON?)"; }
+    mv "$f.tmp" "$f"
   else
     cp "$(_tpl)" "$f"
   fi

@@ -5,7 +5,7 @@ with Roborazzi. Scaffolded from the
 [android-on-debian](https://github.com/MensuraMedia/android-on-debian) template.
 
 ```bash
-./gradlew recordRoborazziDebug   # render screens to app/build/outputs/roborazzi/
+./gradlew recordRoborazziDebug   # render screens to app/src/test/screenshots/ (committed baselines)
 ./gradlew assembleDebug          # build the APK
 ```
 

@@ -21,6 +21,7 @@ mod_install() {
     local zip="$ADX_DOWNLOADS/commandlinetools-linux-${ADX_CMDLINE_TOOLS_BUILD}_latest.zip" tmp
     adx_log "downloading cmdline-tools $ADX_CMDLINE_TOOLS_BUILD"
     adx_download "https://dl.google.com/android/repository/commandlinetools-linux-${ADX_CMDLINE_TOOLS_BUILD}_latest.zip" "$zip"
+    adx_sha256_check "$zip" "$ADX_CMDLINE_TOOLS_SHA256"
     tmp="$(mktemp -d)"
     unzip -q "$zip" -d "$tmp"
     mkdir -p "$ANDROID_HOME/cmdline-tools"

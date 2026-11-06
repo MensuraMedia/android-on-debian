@@ -14,8 +14,9 @@ import kotlin.coroutines.cancellation.CancellationException
 object AppLog {
     private const val PREFIX = "@@APP_NAME@@/"
 
-    fun d(area: String, msg: String) = Log.d(PREFIX + area, msg)
-    fun i(area: String, msg: String) = Log.i(PREFIX + area, msg)
+    // Debug and info lines may carry user data (location, URLs): debug builds only.
+    fun d(area: String, msg: String) { if (BuildConfig.DEBUG) Log.d(PREFIX + area, msg) }
+    fun i(area: String, msg: String) { if (BuildConfig.DEBUG) Log.i(PREFIX + area, msg) }
     fun w(area: String, msg: String, t: Throwable? = null) = Log.w(PREFIX + area, msg, t)
     fun e(area: String, msg: String, t: Throwable? = null) = Log.e(PREFIX + area, msg, t)
 

@@ -23,7 +23,7 @@ emulator through mobile-mcp only when needed.
 2. Every screen and important state gets a `@Test` in
    `app/src/test/kotlin/.../*ScreenshotTest.kt` calling `captureRoboImage(...)`.
 3. Run `./gradlew recordRoborazziDebug`, then read the PNGs in
-   `app/build/outputs/roborazzi/` to check the result. Iterate.
+   `app/src/test/screenshots/` (committed baselines) to check the result. Iterate.
 4. For taps, navigation and runtime behaviour: `adx emulator start`,
    `./gradlew installDebug`, launch, then use the mobile-mcp tools
    (screenshot, tap, type, list elements).
@@ -49,3 +49,11 @@ permission/config decisions, fallbacks, state changes and caught errors; use
   piece of work as every change.
 - `HANDOFF.md`: keep State, How to run/test, Known issues, Next steps and Open
   questions current; update before ending any session that changed something.
+
+## Design and review
+
+- Keep the code modular (one screen or concern per file/package, state passed
+  in as parameters) and minimal: use the ponytail skill (`/ponytail`) for the
+  smallest complete change; `/ponytail-audit` to find bloat.
+- Before calling a change done, run the `adversarial-reviewer` agent on what
+  you touched, and record what it finds in `HANDOFF.md` if you don't fix it.

@@ -25,10 +25,39 @@ only when runtime behaviour matters. Both read the same SDK and JDK.
 | Configuration over code | All versions and paths are in `config/defaults.env`; machine overrides go in `config/local.env` |
 | One capability per module | `modules/<name>/module.sh`, run in a subshell so modules can't leak state |
 | Idempotent | `mod_status` gates `mod_install`, so `adx up` can be re-run safely |
-| Verified downloads | Temurin and Gradle are SHA-256 checked; skills are pinned by commit |
-| No root by default | Everything goes under `$HOME`; sudo only for the optional `jdk` apt fallback and the `kvm` group |
+| Verified downloads | Temurin, cmdline-tools, Gradle (and app wrappers) and Node are SHA-256 checked; skills are pinned by commit; a bad cached download is deleted |
+| No root | Everything goes under `$HOME`; nothing runs sudo, the `system` module prints the commands that need it (apt packages, `kvm` group) |
 | Reversible | `shell-env` writes a marked block that `adx shell-env remove` deletes; modules may provide `mod_remove` |
 | Composable | Profiles are ordered module lists, so a use case is a new profile file |
+| Minimal inside each module (ponytail) | The smallest complete change: no options, wrappers or "for later" code nobody needs; deletion beats addition; known limits marked `shortcut: <limit>, <when to upgrade>` |
+| Logged | Every `adx` run and message goes to `$ADX_LOG_DIR/adx.log`; long-running processes keep their previous log |
+| Detect, then configure | Machine quirks are detected (`system` preflight, `emulator autoconfig`) and written to `config/local.env`, never hard-coded |
+| Never sudo | Modules that need root print the exact command instead (`system`) |
+
+### Modularity rules
+
+The framework is strictly modular. A change that breaks one of these rules
+needs a reason in the commit message.
+
+1. **One capability, one folder.** A new tool or concern is a new
+   `modules/<name>/`, never a branch inside another module. A module may grow
+   verbs (`mod_<verb>`) only for its own capability (e.g. `emulator desktop`).
+2. **Contract only.** The dispatcher talks to modules only through
+   `mod_status` / `mod_install` / `mod_remove` / `mod_<verb>`. Modules call
+   each other only through `adx_run_module <name> <action>`, never by
+   sourcing each other's files.
+3. **No shared mutable state.** Modules run in subshells; anything that must
+   persist goes to `config/local.env` (`adx_local_set`) or a file the module owns.
+4. **Configuration in one place.** Versions, paths and defaults live only in
+   `config/defaults.env`; machine values only in `config/local.env`.
+5. **Core stays small.** `adx` and `lib/common.sh` hold only dispatch,
+   config, logging and helpers used by two or more modules. `adx env` and
+   `adx logs` are core because they report on all modules.
+6. **Profiles compose.** A use case is a profile (ordered module list), not
+   code: `system` first, dependencies before dependents (`node` before
+   `mobile-mcp`).
+7. **Each module is checkable alone.** `adx <name> status` must work without
+   any other module installed, and say what is missing.
 
 ## Module contract
 
@@ -46,9 +75,11 @@ What a module can use:
 
 - every variable from `config/defaults.env` and `config/local.env` (exported)
 - `$ADX_ROOT`, `$MOD_NAME` and `$MOD_DIR`
-- the helpers in `lib/common.sh`: `adx_log`, `adx_warn`, `adx_die`,
-  `adx_have`, `adx_download`, `adx_sha256_check`, `adx_block_write`,
-  `adx_block_remove`, `adx_render_tree`, `adx_run_module`
+- the helpers in `lib/common.sh`: `adx_log`, `adx_warn`, `adx_die` (all three
+  also write to the framework log), `adx_logfile`, `adx_log_rotate`,
+  `adx_log_shift`, `adx_have`, `adx_download`, `adx_sha256_check`,
+  `adx_block_write`, `adx_block_remove`, `adx_block_present`,
+  `adx_render_tree`, `adx_local_set`, `adx_run_module`
 
 ## Config precedence
 

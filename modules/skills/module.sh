@@ -10,7 +10,8 @@ _rows() { grep -vE '^\s*(#|$)' "$(_manifest)" | tr -d ' ' | tr '|' ' '; }
 _fetch() {
   local repo="$1" sha="$2" dir
   dir="$(_cache)/${repo//\//__}@$sha"
-  if [ ! -d "$dir/.git" ]; then
+  if [ "$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null)" != "$sha" ]; then
+    rm -rf "$dir"
     mkdir -p "$dir"
     git -C "$dir" init -q
     git -C "$dir" remote add origin "https://github.com/$repo.git"
