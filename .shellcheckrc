@@ -1,0 +1,5 @@
+# Modules are sourced by lib/common.sh (adx_run_module); MOD_DESC/MOD_NAME/MOD_DIR
+# are read by the dispatcher, which shellcheck cannot see across files.
+shell=bash
+external-sources=true
+disable=SC2034

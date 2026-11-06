@@ -6,6 +6,10 @@ the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- CI: add `.shellcheckrc` (bash dialect; SC2034 disabled for module contract
+  variables read by the dispatcher).
+
 ## [0.1.0] - 2026-11-05
 
 ### Added
