@@ -61,7 +61,7 @@ CHANGELOG/HANDOFF updates and a commit.
 | P1 | Pipeline foundation: `adx check` gate (shell, Rust, docs, process, security), `devtools` module (ShellCheck, cargo-deny, pre-commit hook), `deploy-reviewer` agent, `review-change` workflow, CI hardening; `rust` module; Cargo workspace; `env`, `log`, `ini` + tests | **Done**: reviewed (adversarial: 21 findings, deployment: 9 findings), all fixed and regression-tested |
 | P2 | Inventory: AVD scan, `/proc` process detection, registry, version card; `aodm list/card/env`; `devices` module (build + install) | **Done**: reviewed (code: 13, deployment: 10 findings), all fixed and reproductions replayed |
 | P3 | Lifecycle: port allocation (16 slots), start/stop/restart, RAM/CPU budget, adb + emulator console clients, health | Done, reviewed |
-| P4 | Full-copy saves (create, verify, restore, open as new, prune, pin), clone, rename, delete | Planned |
+| P4 | Full-copy saves (create, verify, restore, open as new, prune, pin), clone, rename, delete | Done, reviewed |
 | P5 | Settings profiles (hardware / launch / runtime, dry-run diff, per-image report), groups, selectors; identity policies (`private`, `standard`, `fixed`, uniqueness check, masked audit); security locks | Planned |
 | P6 | Build templates (built-in `barebones` default, `pixel8-api37`, `small-phone`, `tablet`; capture, validate, drift, batch create, provisioning); bulk app deploy, shell broadcast, screenshots, logcat | Planned |
 | P7 | Spin-offs: standalone phones (linked / portable), `aod-phone run/control` mechanics panel, switchboard calls/SMS between phones, `adopt` | Planned |

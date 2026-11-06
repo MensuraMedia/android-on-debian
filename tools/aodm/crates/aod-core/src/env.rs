@@ -180,6 +180,16 @@ impl Env {
             };
             vars.insert("ANDROID_AVD_HOME".into(), v);
         }
+        // Saves follow ADX_AOD_HOME unless set (as defaults.env does), so a sandbox home
+        // never writes saves into the real one.
+        if vars["ADX_AOD_SAVES_DIR"].source == Source::Fallback {
+            let home = &vars["ADX_AOD_HOME"];
+            let v = Value {
+                value: format!("{}/saves", home.value),
+                source: home.source,
+            };
+            vars.insert("ADX_AOD_SAVES_DIR".into(), v);
+        }
         Env {
             vars,
             config_error: None,
@@ -394,6 +404,23 @@ mod tests {
         let cfg = source_config(&repo_root(), &process).unwrap();
         assert!(!marker.exists(), "code from the environment ran");
         assert_ne!(cfg.get("ADX_EMU_GPU").map(String::as_str), Some("evil"));
+    }
+
+    #[test]
+    fn saves_follow_aod_home() {
+        let none = HashMap::new();
+        let env = Env::resolve(&map(&[("ADX_AOD_HOME", "/sbx")]), &none, None, "/h");
+        assert_eq!(env.get("ADX_AOD_SAVES_DIR"), "/sbx/saves");
+        let env = Env::resolve(
+            &map(&[
+                ("ADX_AOD_HOME", "/sbx"),
+                ("ADX_AOD_SAVES_DIR", "/big/saves"),
+            ]),
+            &none,
+            None,
+            "/h",
+        );
+        assert_eq!(env.get("ADX_AOD_SAVES_DIR"), "/big/saves");
     }
 
     #[test]

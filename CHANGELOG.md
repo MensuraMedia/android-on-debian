@@ -27,6 +27,19 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `ADX_AOD_BASE_PORT`, `ADX_AOD_MAX_INSTANCES`, `ADX_AOD_RAM_RESERVE_MB` have
   defaults in `defaults.env`; nothing to migrate. With two emulators running,
   plain `adb` (no `-s`) fails: set `ANDROID_SERIAL` (see the global rules).
+- P4 adds `$ADX_AOD_SAVES_DIR` (default `~/.local/share/aod/saves`; each
+  save is about the size of the image, 5–10 GB) and `$ADX_AOD_HOME/images.lock`;
+  `images.toml` gains `schema = 1` (the P3 build reads it fine and never
+  writes the file). Uses GNU coreutils `cp` and `sha256sum`; the saves folder
+  must be on a POSIX filesystem (ext4, btrfs, xfs; not exFAT/NTFS).
+- Rolling back from P4: saves (5–10 GB each) are invisible to the P3 build and
+  to v0.2.0; delete the unwanted ones first (`aodm save list`, `save delete`)
+  or remove `$ADX_AOD_SAVES_DIR` afterwards. Images made by `clone`/`save open`
+  are ordinary AVDs and keep working (`aodm delete` them first if not wanted).
+  `schema = 1`, `origin` keys and `images.lock` can stay. Check `ls -a
+  ~/.android/avd "$ADX_AOD_SAVES_DIR"/*/` for hidden `.…partial-*`,
+  `.…restore-*` or `.deleting-*` folders of interrupted runs and remove them
+  by hand.
 - Rolling back: first `aodm stop` every image except `adx_api37` (older adx
   and v0.2.0's `adx emulator stop` would kill all emulators, and its
   screenshot fails with several devices); `ports.lock` and the extra
@@ -40,7 +53,7 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `~/.diagram-design/profiles/aod-flat-dark.md`.
 
 ### Planned for 0.3.0 (approved, not yet built)
-- `aodm`: full-copy saves, clone/rename/delete, groups, bulk settings profiles, bulk
+- `aodm`: groups, bulk settings profiles, bulk
   app deploy, broadcast/capture, terminal UI.
 - Build templates with a built-in `barebones` default; identity policies
   (`private`/`standard`/`fixed`); per-image security locks; spin-offs into
@@ -49,6 +62,23 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- aodm P4 (saves, clone, rename, delete): `aodm save create IMAGE [--label L]`
+  (full copy of a stopped image, quick-boot snapshot included, SHA-256 of every
+  file in `manifest.toml`), `save list [IMAGE]`, `save verify`, `save restore
+  IMAGE ID [--backup-first]` (verified first, swapped in with two renames),
+  `save open IMAGE ID --as NEW`, `save pin [--off]`, `save delete`, `save prune
+  IMAGE [--keep N]`; `aodm clone SRC NEW`, `rename OLD NEW` (saves and registry
+  entry move along), `delete NAME` (saves kept). IDs: exact, unique prefix or
+  `latest`. Restore, delete and prune ask you to type a word (or `--yes`).
+  Each of them holds the image's `multiinstance.lock`, the flock the emulator
+  itself takes, so an image can't run or start while it is copied, moved or
+  removed. Retention `ADX_AOD_MAX_SAVES` (pinned saves exempt), a free-space
+  check with 1 GiB margin, never automatic pruning. adx's own image
+  (`ADX_AVD_NAME`) can't be renamed or deleted. `aodm list`/`card` show a
+  SAVES column.
+- `aod-core` modules `images` and `saves`; `Registry::update` (flock on
+  `images.lock`, `schema = 1`); integration test on a fake SDK
+  (`tests/saves.rs`).
 - aodm P3 (lifecycle): `aodm start|stop|restart|health` for names, `--all`,
   `--group G` and/or `--running`. Start picks a free console port (5554–5584,
   16 slots: adb's range; registry pins and adx's own AVD on `ADX_EMU_PORT`
@@ -105,6 +135,34 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- aodm P4 reviews (code 12, deployment 12 findings):
+  - **Critical:** the `save` commands took the image argument as a path, so
+    `save delete ""`, `..` or an absolute path removed folders outside the
+    saves dir. It must now be an image name, and delete removes only
+    `<saves>/<image>/<id>`.
+  - **Critical:** an image folder that is a symlink (moved to another disk) was
+    "saved" as a link, and clone edited the live folder through it. Symlinked
+    folders are now refused; `delete` removes only the link.
+  - Ctrl-C mid-copy left `cp` running after aodm and its lock were gone: `cp`
+    and `sha256sum` now run in aodm's process group.
+  - Leftovers of interrupted runs (`.…partial-PID`, `.restore-PID`,
+    `.deleting-…-PID`) are removed, and logged, by the next P4 command.
+  - Restore swaps the folders in one atomic `RENAME_EXCHANGE`, so a crash can
+    no longer leave an image without its folder.
+  - Copies are synced to disk before the old state is removed.
+  - An emulator started with `-read-only` (which skips the lock) is detected
+    from `/proc`.
+  - Save ids use UTC (`20261106-221520Z`), so `latest` and prune order survive
+    DST and time-zone changes.
+  - The registry is checked before any disk change, so a newer `schema` no
+    longer leaves half-done clones.
+  - Rename reports what is left to do by hand if a late step fails.
+  - Delete renames the folder before removing it.
+  - `ADX_AOD_SAVES_DIR`, `ADX_AOD_HOME` and `ANDROID_AVD_HOME` must be
+    absolute paths.
+  - Without the framework config, saves follow `ADX_AOD_HOME`.
+  - `sha256sum` output is validated; manifests carry `format = 1`.
+  - The delete prompt shows the folder it removes.
 - P3 reviews (code 14 + deployment 11 findings, all fixed):
   - a failed boot is shut down with console `kill` and SIGTERM, never
     SIGKILL, and only after the console confirms it's the same image; `stop`

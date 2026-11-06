@@ -12,11 +12,13 @@ pub mod console;
 pub mod emu;
 pub mod env;
 pub mod error;
+pub mod images;
 pub mod ini;
 pub mod lifecycle;
 pub mod log;
 pub mod ports;
 pub mod proc;
 pub mod registry;
+pub mod saves;
 
 pub use error::{Error, Result};

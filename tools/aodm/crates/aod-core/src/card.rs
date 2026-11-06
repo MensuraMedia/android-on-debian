@@ -28,6 +28,8 @@ pub struct ImageRow {
     pub device: String,
     pub ram: String,
     pub size: String,
+    /// Number of saves, e.g. `3 (1 pinned)`; `-` for none.
+    pub saves: String,
     pub groups: String,
 }
 
@@ -273,6 +275,16 @@ pub fn build(
             device: i.device().into(),
             ram: i.ram().into(),
             size: avd::human(i.disk_bytes()),
+            saves: {
+                let s = crate::saves::list(&env.path("ADX_AOD_SAVES_DIR"), Some(&i.name))
+                    .unwrap_or_default();
+                let pinned = s.iter().filter(|s| s.pinned).count();
+                match (s.len(), pinned) {
+                    (0, _) => "-".into(),
+                    (n, 0) => n.to_string(),
+                    (n, p) => format!("{n} ({p} pinned)"),
+                }
+            },
             groups: reg.groups(&i.name).join(","),
         })
         .collect();
@@ -320,9 +332,9 @@ pub fn render_text(card: &VersionCard) -> String {
 /// The image table, also used by `aodm list`.
 pub fn render_images(rows: &[ImageRow]) -> String {
     let head = [
-        "IMAGE", "STATE", "API", "ABI", "TAG", "REV", "DEVICE", "RAM", "SIZE", "GROUPS",
+        "IMAGE", "STATE", "API", "ABI", "TAG", "REV", "DEVICE", "RAM", "SIZE", "SAVES", "GROUPS",
     ];
-    let cells: Vec<[&str; 10]> = rows
+    let cells: Vec<[&str; 11]> = rows
         .iter()
         .map(|r| {
             [
@@ -335,6 +347,7 @@ pub fn render_images(rows: &[ImageRow]) -> String {
                 &r.device,
                 &r.ram,
                 &r.size,
+                &r.saves,
                 &r.groups,
             ]
         })
@@ -348,7 +361,7 @@ pub fn render_images(rows: &[ImageRow]) -> String {
             .unwrap_or(0)
     };
     let widths: Vec<usize> = (0..head.len()).map(width).collect();
-    let line = |vals: [&str; 10]| {
+    let line = |vals: [&str; 11]| {
         let s: Vec<String> = vals
             .iter()
             .zip(&widths)
@@ -397,6 +410,7 @@ mod tests {
                 device: "pixel_8".into(),
                 ram: "2G".into(),
                 size: "6.4G".into(),
+                saves: "-".into(),
                 groups: String::new(),
             }],
         }

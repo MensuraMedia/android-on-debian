@@ -1,7 +1,7 @@
 //! `$ADX_AOD_HOME/images.toml`: what aodm knows about images beyond the AVD files
 //! (groups, pinned port, template, origin). Keys it doesn't know are kept on save,
 //! so newer and older aodm versions can share one file. Comments are not kept.
-//! shortcut: no lock and no `schema` key yet; the first writer (P3/P4) adds both.
+//! Writers go through `Registry::update` (flock on `images.lock`, `schema` checked).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -29,8 +29,13 @@ pub struct Entry {
     pub extra: toml::Table,
 }
 
+/// File format version this aodm writes; a newer file is never overwritten.
+pub const SCHEMA: u32 = 1;
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Registry {
+    #[serde(default)]
+    pub schema: u32,
     #[serde(default)]
     pub images: BTreeMap<String, Entry>,
     #[serde(flatten)]
@@ -80,6 +85,37 @@ impl Registry {
         })
     }
 
+    /// Load, change, save under an exclusive lock, so concurrent aodm runs don't lose
+    /// each other's changes.
+    pub fn update(aod_home: &Path, change: impl FnOnce(&mut Registry)) -> Result<()> {
+        fs::create_dir_all(aod_home).map_err(Error::io(aod_home))?;
+        let lock_path = aod_home.join("images.lock");
+        let lock = fs::File::create(&lock_path).map_err(Error::io(&lock_path))?;
+        lock.lock().map_err(Error::io(&lock_path))?;
+        let mut reg = Registry::load(aod_home)?;
+        reg.check(aod_home)?;
+        change(&mut reg);
+        reg.schema = SCHEMA;
+        reg.save(aod_home)
+    }
+
+    /// Errors now if a later `update` would fail (unreadable file, newer schema), so
+    /// commands can refuse before they change anything on disk.
+    pub fn writable(aod_home: &Path) -> Result<()> {
+        Registry::load(aod_home)?.check(aod_home)
+    }
+
+    fn check(&self, aod_home: &Path) -> Result<()> {
+        if self.schema > SCHEMA {
+            return Err(Error::Refused(format!(
+                "{} has schema {} (this aodm writes {SCHEMA}): update aodm before changing images",
+                Registry::path(aod_home).display(),
+                self.schema
+            )));
+        }
+        Ok(())
+    }
+
     pub fn entry(&self, image: &str) -> Option<&Entry> {
         self.images.get(image)
     }
@@ -122,6 +158,22 @@ mod tests {
         let back = Registry::load(dir.path()).unwrap();
         assert_eq!(back, reg);
         assert!(back.extra.contains_key("future_top"));
+    }
+
+    #[test]
+    fn update_sets_schema_and_refuses_newer() {
+        let dir = tempfile::tempdir().unwrap();
+        Registry::update(dir.path(), |r| {
+            r.images.entry("a".into()).or_default().origin = Some("b".into());
+        })
+        .unwrap();
+        let r = Registry::load(dir.path()).unwrap();
+        assert_eq!(
+            (r.schema, r.entry("a").unwrap().origin.as_deref()),
+            (1, Some("b"))
+        );
+        fs::write(Registry::path(dir.path()), "schema = 2\n").unwrap();
+        assert!(Registry::update(dir.path(), |_| {}).is_err());
     }
 
     #[test]

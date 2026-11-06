@@ -19,9 +19,19 @@ pub struct Output {
 /// The deadline also covers the output: a grandchild still holding the pipes after the
 /// child exited (e.g. a daemon forked by adb) can't make aodm wait either.
 pub fn run(cmd: &mut Command, timeout: Duration) -> Result<Output> {
+    // Own group: a timeout kills grandchildren holding the pipes too.
+    run_in(cmd.process_group(0), timeout, true)
+}
+
+/// Like `run`, but the tool stays in aodm's process group, so Ctrl-C in the terminal
+/// stops it together with aodm (long copies must not outlive the lock aodm holds).
+pub fn run_attached(cmd: &mut Command, timeout: Duration) -> Result<Output> {
+    run_in(cmd, timeout, false)
+}
+
+fn run_in(cmd: &mut Command, timeout: Duration, own_group: bool) -> Result<Output> {
     let what = format!("{:?}", cmd.get_program());
     let mut child = cmd
-        .process_group(0) // own group: a timeout kills grandchildren holding the pipes too
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -30,7 +40,8 @@ pub fn run(cmd: &mut Command, timeout: Duration) -> Result<Output> {
     let deadline = Instant::now() + timeout;
     let out = reader(child.stdout.take());
     let err = reader(child.stderr.take());
-    let pgid = rustix::process::Pid::from_raw(child.id() as i32);
+    // Never signal aodm's own group: only a group the child leads.
+    let pgid = rustix::process::Pid::from_raw(child.id() as i32).filter(|_| own_group);
     let kill_group = || {
         if let Some(pg) = pgid {
             let _ = rustix::process::kill_process_group(pg, rustix::process::Signal::KILL);

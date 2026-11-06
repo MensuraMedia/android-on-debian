@@ -54,7 +54,7 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 | --- | --- | --- |
 | `<avd home>/<name>.ini` | `path=` (absolute), `path.rel=` (relative to the Android user home), `target=android-<api>` | `avd::scan`: folder = first existing `*.avd` dir of `path=`, `<user home>/path.rel`, `<avd home>/<name>.avd`. AVD home as the emulator resolves it: `ANDROID_AVD_HOME`, else `$ANDROID_EMULATOR_HOME/avd`, else `$ANDROID_USER_HOME/avd`, else `~/.android/avd` |
 | `<name>.avd/config.ini` | hardware/device/image keys (`hw.*`, `abi.type`, `tag.id`, `image.sysdir.1`); `avd.id`/`avd.name` are literal `<build>` placeholders | `avd::Image` accessors, lossless `ini` editor |
-| `<name>.avd/` | qcow2 disks (relative backing files), `snapshots/` (absolute paths), lock files while running | size via allocated blocks (`du`), copies in P4 |
+| `<name>.avd/` | qcow2 disks (relative backing files), `snapshots/default_boot/` (quick-boot; `hardware.ini` and `snapshot.pb` hold the folder's absolute path), per-run files (`hardware-qemu.ini`, `emu-launch-params.txt`, lock files) | size via allocated blocks (`du`); copied by saves/clone (P4) |
 | `$ANDROID_HOME/<image.sysdir.1>/source.properties` | system image `Pkg.Revision` | version card / list `REV` |
 | `/proc/<pid>/cmdline` | running emulators: qemu process name + `-avd`/`-port` | `proc::emulators` (never matches shells) |
 | `$ADX_AOD_HOME/images.toml` | registry: groups, pinned port, template, origin; unknown keys preserved; atomic save | `registry::Registry` |
@@ -66,7 +66,70 @@ Only the current user's emulators count as running; `-avd NAME` and the
 launcher's `@NAME`, `-port N` and `-ports N,M` are recognised. Sizes count
 allocated blocks, stay on one filesystem, and count hard links once. Names aodm accepts: letters, digits, `.`,
 `_`, `-`, 1–64 characters, not starting with `.` or `-`.
-## 4. Saves *(P4)*
+## 4. Saves, clone, rename, delete *(P4, done)*
+
+```
+$ADX_AOD_SAVES_DIR/<image>/<YYYYmmdd-HHMMSS>Z[-label]/   (UTC: sorts by time)
+  avd/            the image folder (quick-boot snapshot included, per-run files dropped)
+  image.ini       the image's <name>.ini at save time
+  manifest.toml   format = 1, aodm version, image, source folder, label, created, target/abi/tag,
+                  system image and emulator revisions, size + SHA-256 of every file
+  pinned          (optional) kept by prune, not counted against ADX_AOD_MAX_SAVES
+```
+
+- **The lock.** Every command that changes an image holds an exclusive flock
+  on its `multiinstance.lock`, the lock the emulator takes itself. Checked on
+  37.2.13: while aodm holds it, `emulator -avd` exits with "Another emulator
+  instance is running". So a running image is refused ("stop it first"), and
+  nothing can start it mid-copy. A qemu process running the image is refused
+  too (`-read-only` emulators skip the lock).
+- **Inputs.** Image arguments are image names, never paths. An image folder
+  that is a symlink is refused (copies would copy the link and edit the live
+  folder); `delete` removes only the link. `ADX_AOD_SAVES_DIR`,
+  `ADX_AOD_HOME` and `ANDROID_AVD_HOME` must be absolute. The saves folder
+  must be on a POSIX filesystem (ext4, btrfs, xfs).
+- **Interruptions.** `cp` and `sha256sum` run in aodm's process group, so
+  Ctrl-C stops them with aodm. Work happens in hidden folders named with the
+  aodm pid (`.…partial-PID`, `.…restore-PID`, `.deleting-…-PID`); every P4
+  command first removes those whose process is gone and logs it ("removed
+  leftover of an interrupted run"). Copies are synced (`syncfs`) before any
+  original is removed.
+- **Create.** Refuses a broken image, too many unpinned saves
+  (`ADX_AOD_MAX_SAVES`; never prunes by itself) and too little space (image
+  size + 1 GiB). Copies with `cp --archive --sparse=always --reflink=auto` into
+  `.partial-<pid>`, drops per-run files, hashes the copy (`sha256sum`), writes
+  the manifest, renames into place. Plain files only (a symlink is refused).
+  On failure the partial folder is removed.
+- **Verify.** Re-hashes and reports missing, changed and unexpected files.
+- **Restore in place.** Verifies first (a damaged save is never restored),
+  copies next to the image, then swaps both folders in one atomic
+  `renameat2(RENAME_EXCHANGE)`: at no moment is the image without a folder;
+  the old state is then removed. The quick-boot snapshot is kept when the image lives
+  in the folder it was saved from, otherwise dropped (cold boot).
+  `--backup-first` saves the current state first. The system image isn't in
+  the save: a changed revision is reported (expect a cold boot).
+- **Open as new / clone.** Same copy-in step: `.<name>.avd.partial-<pid>`,
+  per-run files and the snapshot dropped (its paths name the old folder),
+  `avd.id`/`avd.name` set, renamed into place, `<name>.ini` written
+  (`path=`, `path.rel=` under the Android user home, `target=`), `origin`
+  recorded in the registry (`image@save` or the source image). First boot is
+  cold. The copy keeps the source's Android ID until identity policies (P5).
+- **Rename.** Moves the folder in place, rewrites `config.ini` and the `.ini`,
+  drops the snapshot, moves the registry entry and the saves folder. A failure
+  before the new `.ini` is written is undone; a later one says exactly what to
+  move by hand.
+- **Delete.** Removes the `.ini`, then renames the folder to a hidden
+  `.deleting-` name and removes it, then the registry entry; keeps the saves.
+  The prompt shows the folder. Works on broken images. Never removes a folder that another image's
+  `.ini` also points at.
+- **adx's image.** `ADX_AVD_NAME` can't be renamed or deleted by aodm (adx
+  depends on the name); clone it instead.
+- **Registry.** Writers use `Registry::update`: flock on
+  `$ADX_AOD_HOME/images.lock`, load, change, atomic save with `schema = 1`;
+  a file with a newer schema is never overwritten. Every P4 command checks
+  this before it changes anything on disk.
+- **Measured** (this laptop, ext4, no reflink): save of a 4.9 GB image 6.5 s,
+  verify 3.3 s, open as new 6 s, clone 6 s, restore + quick boot 4 s.
 ## 5. Running many emulators *(P3, done)*
 
 `aodm start|stop|restart|health TARGETS`: TARGETS are image names, `--all`,
@@ -171,6 +234,27 @@ reason here and in [dependencies.md](dependencies.md), passes `cargo deny`
 
 ## 15. Testing *(every phase)*
 
+P4: 65 tests (63 unit, 2 integration); new: image lock refuses while held, per-run file cleanup,
+space check, registry `update` (schema written, newer schema refused), save
+lookup (exact, prefix, ambiguous, `latest`), prune plan (pinned and newest
+kept), hashing (known SHA-256, spaces in names, symlinks refused), labels; and
+an integration test on a fake SDK (`tests/saves.rs`): refused while locked,
+save with retention and pinning, a damaged save detected and never restored,
+restore in place keeping the snapshot, open as new, clone, rename with saves,
+group and registry moved, adx's image protected, a corrupt `.ini` that points
+at another image's folder, delete keeping saves; after the reviews also
+path-like image arguments (`""`, `..`, absolute), a symlinked image folder
+(save, clone, rename refused; delete removes only the link), a newer registry
+schema refusing a clone before any copy, leftovers of dead runs swept while a
+live run's are kept, a relative saves dir refused, saves following a sandbox
+`ADX_AOD_HOME`. End to end on the real
+emulator: save/verify, a marker file removed by restore with quick boot kept,
+open as new and a renamed clone booting next to `adx_api37` (each console
+answering with its own name), delete refused while running, prune; after
+the reviews: restore by atomic exchange (no leftovers, quick boot 4 s), a
+clone killed mid-copy (aodm and `cp` both gone, the 2.4 GB leftover removed
+and logged by the next command).
+
 P3 review: 55 unit tests; new: port-pin validation, emulator environment,
 panicked worker thread, grandchild holding pipes, token with a line break.
 Replayed end to end (on a throwaway copy only): concurrent `start` waits on
@@ -227,6 +311,8 @@ keeping mode and symlinks). Run:
 | 2026-11-06 | Plan | Rust; CLI+TUI first, GUI later; full-copy saves; identity policies; spin-offs; templates; change pipeline |
 | 2026-11-06 | P0 | Spike results: see research/aodm-spike.md (IMEI/serial/SIM fixed by emulator; Android ID must be regenerated on copies; console-driven calls/SMS) |
 | 2026-11-06 | P1 | Gate's own first run found and fixed: new files not scanned for secrets; secrets echoed into the log |
+| 2026-11-06 | P4 review | code (12) + deployment (12) findings; fixed: path-like image arguments could delete outside the saves dir, symlinked image folders, orphaned `cp` on Ctrl-C, leftover sweep, atomic restore swap, syncfs, `-read-only` detection, UTC ids, registry checked first, absolute dirs, saves follow a sandbox home, manifest format; recorded below: delete outside the AVD home, saves size in `adx devices` status |
+| 2026-11-06 | P4 | The emulator's own `multiinstance.lock` as aodm's image lock; coreutils `cp`/`sha256sum` instead of new crates; snapshot kept only in place |
 | 2026-11-06 | P3 | Console client instead of `adb emu` for stop/health (independent of adb); reserved ports so `adx emulator` and aodm never collide; no SIGKILL |
 | 2026-11-06 | P3 review | code (14) + deployment (11) findings, all fixed: no SIGKILL on failed boots, identity check before console kill, running = process + image lock (sandbox-safe), resolved Android paths passed to the emulator, checks under `ports.lock`, restart and `--wipe` semantics, pin validation, gate's staged target dir |
 | 2026-11-06 | P2 review | code review (13) + deployment review (10), all fixed: junk `.ini` no longer hides images, emulator AVD-home lookup order, own-user emulators only, `@name`/`-ports`, allowlisted config environment, `devices` ownership marker and rebuild on new commit; reproductions replayed |
@@ -237,14 +323,20 @@ keeping mode and symlinks). Run:
 - `budget`: an emulator started seconds ago hasn't used its RAM yet, so
   separate back-to-back `aodm start` runs can overcommit; start them in one run.
 - Lifecycle orchestration (`lifecycle::start/stop`) is tested end to end on
-  the real emulator, not by an automated fake-SDK test yet (planned with P4's
-  integration tests).
+  the real emulator, not by an automated fake-emulator test yet (P4's
+  integration test covers saves/clone/rename/delete only); planned with P9.
+- Copies keep the source's Android ID until identity policies (P5).
+- `cp` shares aodm's process group: Ctrl-C or killing the group stops both,
+  but a signal to aodm's pid alone (e.g. `kill PID`) leaves `cp` finishing its
+  copy; the next command removes the leftover.
+- `delete` removes whatever `*.avd` folder `path=` names, also outside
+  `ANDROID_AVD_HOME` (the prompt shows it); no `--force` guard.
+- `adx devices status` doesn't report how much disk saves use (`aodm save list`
+  does).
 - `health` doesn't restart a lost adb server (that would drop every device,
   mobile-mcp included); it says so.
 
-- `registry`: no `schema` key yet; the first writer (P3/P4) adds `schema = 1`
-  and refuses to save over a newer schema. `list`/`card` warn and continue on a
-  broken `images.toml`.
+- `registry`: `list`/`card` warn and continue on a broken `images.toml`.
 
 - `env`: built-in fallbacks duplicate `defaults.env` (only used without the framework).
 - `log`: rotation can race a concurrent adx run (harmless, one extra generation).
