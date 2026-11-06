@@ -17,6 +17,8 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Claude integration | Global rules + `adversarial-reviewer` agent via `claude-rules`; mobile-mcp pinned 1.0.16 |
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
+| Phone image manager | Branch `feat/aodm` (P3): `aodm list`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--running`); installed by `adx devices install`; 51 unit tests; lifecycle verified on the real emulator (two images on 5554/5556). Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
+| Push | `feat/aodm` is local only: the GitHub token lacks the `workflow` scope (the branch changes `.github/workflows/`). Fix: `gh auth refresh -h github.com -s workflow`, then `git push -u origin feat/aodm` |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
 ## This machine (hybrid-GPU laptop)
@@ -32,8 +34,9 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
    (spike) and P1 (gate, devtools, rust, agents, workflow, CI, workspace core)
    done and reviewed (30 findings fixed); P2 (inventory, process detection,
    registry, version card, `devices` module) done and reviewed (23 findings
-   fixed); next P3
-   (ports, start/stop/restart, budget, adb + console clients, health). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
+   fixed); P3 (ports, start/stop/restart/health, budget, adb + console
+   clients) done and verified end to end on the real emulator, reviews
+   pending; next P4 (full-copy saves, clone, rename, delete). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
 2. Decide the permission-allowlist items in Open questions, then apply them in
    `templates/claude/settings.json` and let `claude-permissions` tighten rules.
 3. Push to `LinearGenetics/android-on-debian` once the account has write access

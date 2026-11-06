@@ -67,7 +67,56 @@ launcher's `@NAME`, `-port N` and `-ports N,M` are recognised. Sizes count
 allocated blocks, stay on one filesystem, and count hard links once. Names aodm accepts: letters, digits, `.`,
 `_`, `-`, 1–64 characters, not starting with `.` or `-`.
 ## 4. Saves *(P4)*
-## 5. Running many emulators *(P3)*
+## 5. Running many emulators *(P3, done)*
+
+`aodm start|stop|restart|health TARGETS`: TARGETS are image names, `--all`,
+`--group G`, and/or `--running` (alone: every running image). `health` with
+no TARGETS checks every image.
+
+- **Ports.** adb discovers emulators only on console ports 5554–5584 (even;
+  adb port = console + 1): 16 slots from `ADX_AOD_BASE_PORT`. Reserved ports
+  (a `port` pin in `images.toml`, and `ADX_EMU_PORT` for adx's own
+  `ADX_AVD_NAME`) belong to their image only, so `adx emulator start` always
+  finds its port. Otherwise the first slot that no running emulator uses and
+  where both ports bind on 127.0.0.1. `$ADX_AOD_HOME/ports.lock` (flock) is
+  held from port choice until every emulator of the run has booted, so two
+  aodm runs never pick the same port.
+- **Running check** (three signals): the `/proc` scan (own user, qemu process
+  only), the console port from its argv, and the image's `multiinstance.lock`
+  (exclusive flock held by the emulator, verified on 37.2.13). An image whose
+  lock is held while no own emulator runs it is refused, not started twice.
+- **Budget.** Before anything starts: running + new ≤ `ADX_AOD_MAX_INSTANCES`;
+  the guest RAM of the new images (`hw.ramSize`) + `ADX_AOD_RAM_RESERVE_MB` ≤
+  `MemAvailable` (running guests are already counted there). Emulator cores
+  above host threads only warn. One refusal stops the whole start.
+- **Launch.** Same as `adx emulator start`: `-avd N -port P -gpu
+  $ADX_EMU_GPU -no-boot-anim`, `-no-window -no-audio` when headless,
+  `ADX_EMU_ENV` for the emulator process only, log in
+  `$ADX_LOG_DIR/emulator-<image>.log` (previous run kept as `.1`). `--cold`
+  adds `-no-snapshot-load`, `--wipe` adds `-wipe-data` after a typed
+  confirmation (or `--yes`). The emulator runs in its own process group, so
+  Ctrl-C or closing aodm's terminal leaves it running.
+- **Boot.** All images of one run boot in parallel; each waits for
+  `sys.boot_completed=1` and fails fast if the emulator exits, if adb still
+  says `unauthorized` after 60 s (hint: `--wipe`), or after
+  `ADX_EMU_BOOT_TIMEOUT`. A failed boot is killed so it doesn't hold a port.
+- **Stop.** Console `kill` (the emulator saves its quick-boot snapshot) and up
+  to 30 s to exit; then SIGTERM and 15 s, after re-checking that the pid is
+  still that emulator. Never SIGKILL (can corrupt the image): a stuck emulator
+  is reported with the pid.
+- **Clients.** `adb` runs with `-s emulator-<port>` and a timeout every time;
+  a timed-out tool is killed with its process group. The console client speaks
+  the emulator's protocol directly (banner, `auth` with
+  `~/.emulator_console_auth_token`, replies ending in `OK` / `KO:`), so health
+  has a signal independent of adb, and P7's mechanics panel reuses it. The
+  token is never logged.
+- **Health.** Per image: process, serial, adb state, boot, console (`avd
+  name` must match the image, then `avd status`), error lines in the emulator
+  log. Exit 1 when a running image isn't booted and answering, or an image is
+  broken or locked by something else.
+- **Measured** (this laptop, software GPU): quick-boot start 8–10 s, cold
+  boot of a fresh copy next to a running emulator 18 s, console stop 11 s,
+  crash during boot reported in 2 s.
 ## 6. Settings profiles *(P5)*
 ## 7. Templates *(P6)*
 ## 8. Identity policies *(P5)*
@@ -110,6 +159,17 @@ reason here and in [dependencies.md](dependencies.md), passes `cargo deny`
 
 ## 15. Testing *(every phase)*
 
+P3: 51 unit tests in total; new: tool deadline and process-group kill,
+console protocol against a fake console (auth, `KO:`, `kill` hang-up, no
+line-break injection, bad token), adb states and a fake serial-scoped adb,
+port slots / reservation / busy pin / 16-slot exhaustion, port lock
+exclusivity, budget (instances, RAM reserve, CPU warning, `hw.ramSize`
+syntaxes), launch arguments equal to adx's, `ADX_EMU_ENV` parsing,
+`multiinstance.lock`, log error lines. End to end on the real emulator:
+stop/start of `adx_api37`, a second image on 5556 next to it, `adx emulator
+stop` leaving the other image running, restart, `stop --running`, a broken
+image failing fast with no process left.
+
 P2: 30 unit tests in total; new: AVD scan of a fake home (stale `path=`,
 broken images, non-AVD files), name rules, `.properties` parsing, `du`, human
 sizes, `/proc` parsing (real emulator line, shells, launcher, `-headless`),
@@ -148,10 +208,19 @@ keeping mode and symlinks). Run:
 | 2026-11-06 | Plan | Rust; CLI+TUI first, GUI later; full-copy saves; identity policies; spin-offs; templates; change pipeline |
 | 2026-11-06 | P0 | Spike results: see research/aodm-spike.md (IMEI/serial/SIM fixed by emulator; Android ID must be regenerated on copies; console-driven calls/SMS) |
 | 2026-11-06 | P1 | Gate's own first run found and fixed: new files not scanned for secrets; secrets echoed into the log |
+| 2026-11-06 | P3 | Console client instead of `adb emu` for stop/health (independent of adb); reserved ports so `adx emulator` and aodm never collide; no SIGKILL |
 | 2026-11-06 | P2 review | code review (13) + deployment review (10), all fixed: junk `.ini` no longer hides images, emulator AVD-home lookup order, own-user emulators only, `@name`/`-ports`, allowlisted config environment, `devices` ownership marker and rebuild on new commit; reproductions replayed |
 | 2026-11-06 | P1 review | adversarial-reviewer (21 findings) and deploy-reviewer (9 findings), all fixed; reproductions replayed in a clean clone: staged-snapshot gate, secret kinds, section continuation, shallow clone, pipe-to-shell forms, hook ownership |
 
 ## 18. Known limits (`shortcut:` ledger)
+
+- `budget`: an emulator started seconds ago hasn't used its RAM yet, so
+  separate back-to-back `aodm start` runs can overcommit; start them in one run.
+- Lifecycle orchestration (`lifecycle::start/stop`) is tested end to end on
+  the real emulator, not by an automated fake-SDK test yet (planned with P4's
+  integration tests).
+- `health` doesn't restart a lost adb server (that would drop every device,
+  mobile-mcp included); it says so.
 
 - `registry`: no `schema` key yet; the first writer (P3/P4) adds `schema = 1`
   and refuses to save over a newer schema. `list`/`card` warn and continue on a

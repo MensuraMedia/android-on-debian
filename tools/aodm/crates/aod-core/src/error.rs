@@ -21,6 +21,11 @@ pub enum Error {
     /// A value or key that would corrupt a file (e.g. a newline injecting a second key).
     #[error("invalid {what}: {detail}")]
     Invalid { what: &'static str, detail: String },
+    #[error("{what} timed out after {secs} s")]
+    Timeout { what: String, secs: u64 },
+    /// aodm declines on purpose (budget, port busy, image in use): the message says what to do.
+    #[error("{0}")]
+    Refused(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

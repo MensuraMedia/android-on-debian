@@ -74,7 +74,7 @@ fn cpu() -> String {
     )
 }
 
-fn meminfo(key: &str) -> Option<u64> {
+pub(crate) fn meminfo(key: &str) -> Option<u64> {
     read("/proc/meminfo")?
         .lines()
         .find_map(|l| {

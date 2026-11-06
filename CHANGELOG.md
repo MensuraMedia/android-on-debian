@@ -31,8 +31,7 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `~/.diagram-design/profiles/aod-flat-dark.md`.
 
 ### Planned for 0.3.0 (approved, not yet built)
-- `aodm`: lifecycle for one, a group or all images (ports, budget, health),
-  full-copy saves, clone/rename/delete, groups, bulk settings profiles, bulk
+- `aodm`: full-copy saves, clone/rename/delete, groups, bulk settings profiles, bulk
   app deploy, broadcast/capture, terminal UI.
 - Build templates with a built-in `barebones` default; identity policies
   (`private`/`standard`/`fixed`); per-image security locks; spin-offs into
@@ -41,6 +40,23 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- aodm P3 (lifecycle): `aodm start|stop|restart|health` for names, `--all`,
+  `--group G` and/or `--running`. Start picks a free console port (5554–5584,
+  16 slots: adb's range; registry pins and adx's own AVD on `ADX_EMU_PORT`
+  are reserved), checks the budget (`ADX_AOD_MAX_INSTANCES`, host RAM minus
+  `ADX_AOD_RAM_RESERVE_MB`; CPU oversubscription warns), launches with the
+  same flags, environment and log file as `adx emulator start` (detached),
+  boots several images in parallel and fails fast on a crash or an
+  `unauthorized` device. `--window`, `--cold`, `--wipe` (asks you to type
+  `wipe`, or `--yes`). Stop uses the emulator console `kill` (quick-boot
+  snapshot saved), then SIGTERM, never SIGKILL. Health checks process, adb
+  state, boot, console (`avd name` must match) and emulator-log errors, and
+  exits 1 when something needs attention. `ports.lock` keeps concurrent
+  aodm starts off each other's ports; an image whose `multiinstance.lock` is
+  held by a process aodm can't attribute is refused.
+- `aod-core` modules `cmd` (external tools with a deadline; kills the whole
+  process group), `adb` (serial-scoped), `console` (emulator console client
+  with auth token), `ports`, `budget`, `emu`, `lifecycle`.
 - aodm P2 (inventory and version card): `aodm list [--group G]` (state,
   port, API, ABI, tag, system image revision, device, RAM, size, groups),
   `aodm card` (two even columns: aodm/adx versions, host, toolchain,
@@ -147,6 +163,8 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   honour the environment. `aodm env` warns about ignored environment values.
   To sandbox aodm, set `ADX_AOD_HOME` (and/or `ADX_AOD_SAVES_DIR`), which are
   now `${VAR:-default}` keys for adx and aodm alike, or `ANDROID_AVD_HOME`.
+- `rustix` dependency gains its `process` feature (kill, process groups); no
+  new crates.
 - CI triggers once per change (push to `main` and tags, pull requests) and
   cancels superseded runs.
 - `origin` pushes to MensuraMedia only; LinearGenetics is a separate remote
