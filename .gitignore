@@ -1,0 +1,9 @@
+# Machine-specific config
+config/local.env
+# Claude Code per-user settings
+.claude/settings.local.json
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

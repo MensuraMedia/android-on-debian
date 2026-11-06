@@ -1,0 +1,22 @@
+# Claude Code skills installed into each app project's .claude/skills/.
+# Format: name | github owner/repo | pinned commit | path to skill dir in repo
+# Skills only — plugin hooks are deliberately NOT installed (see docs/skills.md).
+# To upgrade: change the commit, then `adx skills apply <app-dir>`.
+# To add one: append a line; to drop one: comment it out.
+
+# UI/UX design quality (anti-AI-slop). Web-oriented; apply its principles to Compose.
+hallmark       | Nutlope/hallmark              | 407fa689f4a276f2fd389208d271d0fef08f5058 | skills/hallmark
+
+# SwiftUI best practices (iOS). Reference for cross-platform parity / a future iOS template.
+swiftui-pro    | twostraws/SwiftUI-Agent-Skill | f2920b63995263f57b3e198674e89a602efba6d2 | swiftui-pro
+
+# Advanced features: autonomous modify -> verify -> keep/discard iteration loops.
+autoresearch   | uditgoenka/autoresearch       | 7bddd056dfd0b0ded8360588d8101b1ecb5c0baa | claude-plugin/skills/autoresearch
+
+# Code control: simplest-solution discipline, audits, debt tracking, reviews.
+ponytail        | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail
+ponytail-audit  | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-audit
+ponytail-debt   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-debt
+ponytail-gain   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-gain
+ponytail-help   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-help
+ponytail-review | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-review

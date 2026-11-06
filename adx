@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# adx — Android Dev eXperience: modular setup framework for CLI-first
+# Android development on Debian-family Linux. See README.md.
+#
+#   adx list                         modules, descriptions and status
+#   adx doctor                       status of every module (non-zero if any fail)
+#   adx up [profile]                 install every module in a profile (default: default)
+#   adx <module> [action] [args...]  run one module action (default action: status)
+#   adx <module> help                actions a module provides
+set -euo pipefail
+
+ADX_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+export ADX_ROOT
+# shellcheck source=lib/common.sh
+. "$ADX_ROOT/lib/common.sh"
+adx_load_config
+
+adx_usage() {
+  sed -n '2,10p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
+}
+
+adx_cmd_list() {
+  local m
+  printf '%-20s %-8s %s\n' MODULE STATUS DESCRIPTION
+  for m in $(adx_modules); do
+    local st
+    if adx_run_module "$m" status >/dev/null 2>&1; then st=ok; else st=missing; fi
+    printf '%-20s %-8s %s\n' "$m" "$st" "$(adx_module_desc "$m")"
+  done
+}
+
+adx_cmd_doctor() {
+  local m rc=0
+  for m in $(adx_modules); do
+    printf '\n== %s ==\n' "$m"
+    adx_run_module "$m" status || rc=1
+  done
+  return $rc
+}
+
+adx_cmd_up() {
+  local profile="${1:-default}" file m
+  file="$ADX_ROOT/profiles/$profile.profile"
+  [ -f "$file" ] || adx_die "no profile '$profile' (see profiles/)"
+  adx_log "profile: $profile"
+  for m in $(grep -vE '^\s*(#|$)' "$file"); do
+    if adx_run_module "$m" status >/dev/null 2>&1; then
+      adx_log "$m: already ok"
+    else
+      adx_log "$m: installing"
+      adx_run_module "$m" install
+    fi
+  done
+  adx_log "profile '$profile' done"
+}
+
+case "${1:-}" in
+  ""|-h|--help|help) adx_usage ;;
+  list)   adx_cmd_list ;;
+  doctor) adx_cmd_doctor ;;
+  up)     shift; adx_cmd_up "$@" ;;
+  *)      m="$1"; shift; adx_run_module "$m" "${1:-status}" "${@:2}" ;;
+esac

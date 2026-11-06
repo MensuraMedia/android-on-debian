@@ -1,0 +1,13 @@
+name: lint
+on: [push, pull_request]
+jobs:
+  shell:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash syntax
+        run: for f in adx lib/*.sh modules/*/module.sh; do bash -n "$f"; done
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck -x -s bash -S warning adx lib/*.sh modules/*/module.sh
