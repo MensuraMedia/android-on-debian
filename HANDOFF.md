@@ -57,7 +57,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
    clients) done, reviewed (25 findings fixed) and verified end to end on
    the real emulator; P4 (saves, clone, rename, delete) done, reviewed (24
    findings: 2 critical, all fixed or recorded) and verified end to end;
-   next P5 (settings profiles, groups, identity). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
+   next P5, which starts with the CLI conventions of the command library
+   spec [docs/aodm-cli.md](docs/aodm-cli.md) (`--json`, `--dry-run`, exit
+   codes, `doctor`, `config`, `logs`, `audit`, `disk`, `gc`), then settings
+   profiles, groups, identity and locks. Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
 2. Decide the permission-allowlist items in Open questions, then apply them in
    `templates/claude/settings.json` and let `claude-permissions` tighten rules.
 3. Push to `LinearGenetics/android-on-debian` once the account has write access

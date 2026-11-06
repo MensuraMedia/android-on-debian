@@ -110,7 +110,7 @@ _chk_docs() {
   done < <(_chk_ls '*.md' | grep -vE '^(docs/research/|config/skill-profiles/|\.claude/|tools/aodm/target/)' || true)
   if [ "$bad" = 0 ]; then _ok "relative links"; fi
   # Every `adx <module> [<action>]` in docs exists (module dir + mod_<action>).
-  local known="list doctor up env logs check help" planned="release upgrade new-module" pending="" cmd mod act
+  local known="list doctor up env logs check help" planned="release upgrade new-module review" pending="" cmd mod act
   bad=0
   while IFS= read -r cmd; do
     mod="${cmd%% *}"; act=""; [ "$cmd" != "$mod" ] && act="${cmd#* }"

@@ -62,11 +62,11 @@ CHANGELOG/HANDOFF updates and a commit.
 | P2 | Inventory: AVD scan, `/proc` process detection, registry, version card; `aodm list/card/env`; `devices` module (build + install) | **Done**: reviewed (code: 13, deployment: 10 findings), all fixed and reproductions replayed |
 | P3 | Lifecycle: port allocation (16 slots), start/stop/restart, RAM/CPU budget, adb + emulator console clients, health | Done, reviewed |
 | P4 | Full-copy saves (create, verify, restore, open as new, prune, pin), clone, rename, delete | Done, reviewed |
-| P5 | Settings profiles (hardware / launch / runtime, dry-run diff, per-image report), groups, selectors; identity policies (`private`, `standard`, `fixed`, uniqueness check, masked audit); security locks | Planned |
-| P6 | Build templates (built-in `barebones` default, `pixel8-api37`, `small-phone`, `tablet`; capture, validate, drift, batch create, provisioning); bulk app deploy, shell broadcast, screenshots, logcat | Planned |
-| P7 | Spin-offs: standalone phones (linked / portable), `aod-phone run/control` mechanics panel, switchboard calls/SMS between phones, `adopt` | Planned |
-| P8 | Terminal UI: dashboard, details, version card, templates, identity, locks, results; confirmation modals | Planned |
-| P9 | `adx release`, `adx upgrade` + migrations + rollback, `adx new-module`; technical document `docs/phone-image-manager.md`; diagrams (saves flow, identity classes, spin-off/switchboard, change pipeline, template lifecycle); end-to-end check; **release v0.3.0** | Planned |
+| P5 | CLI conventions from [docs/aodm-cli.md](docs/aodm-cli.md) (`--json`, `--dry-run`, `--sandbox`, exit codes 3–5, docs/CLI gate); `show`, `wipe`, groups, tags; settings profiles (hardware / launch / runtime, plan/apply/drift, per-image report); identity policies (`private`, `standard`, `fixed`, uniqueness check, masked audit); security locks; manager administration: `doctor`, `config get/set/unset/validate`, `logs`, `audit`, `disk`, `gc`, `completion` | Planned |
+| P6 | Build templates (built-in `barebones` default, `pixel8-api37`, `small-phone`, `tablet`; capture, validate, drift, batch create, provisioning); bulk app deploy, shell broadcast, screenshots, recording, logcat, push/pull, geo; system image catalogue (`sysimg`); `move` | Planned |
+| P7 | Spin-offs: standalone phones (linked / portable), `aod-phone run/control` mechanics panel, switchboard calls/SMS between phones, `adopt`, `export`/`import`, raw `console` | Planned |
+| P8 | Terminal UI and `watch`: dashboard, details, version card, templates, identity, locks, results; confirmation modals | Planned |
+| P9 | `adx review`, `adx release`, `adx upgrade` + migrations + `--rollback`, `adx new-module`; fake-emulator lifecycle tests; technical document `docs/phone-image-manager.md`; diagrams (saves flow, identity classes, spin-off/switchboard, change pipeline, template lifecycle); end-to-end check; **release v0.3.0** | Planned |
 
 The ten multi-device features delivered across P2–P8: inventory dashboard;
 create from templates in batches; lifecycle for one/group/all; full-copy saves;

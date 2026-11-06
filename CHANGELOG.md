@@ -62,6 +62,16 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- `docs/aodm-cli.md`: the complete command library (specification): the
+  twenty management and architecture features (inventory, lifecycle,
+  provisioning, clone/rename/delete, backup/restore, groups, configuration
+  management, identity, policy locks, app deployment, remote execution,
+  monitoring, resource management, audit, portability, system image
+  catalogue, scripting, self-administration, upgrades/rollback, storage/GC),
+  CLI conventions (grammar, selectors, `--json`, `--dry-run`, `--sandbox`,
+  exit codes), every command for images, the manager and its settings with
+  status and phase, the settings reference and the deployment pipeline
+  commands. ROADMAP phases P5–P9 extended accordingly.
 - aodm P4 (saves, clone, rename, delete): `aodm save create IMAGE [--label L]`
   (full copy of a stopped image, quick-boot snapshot included, SHA-256 of every
   file in `manifest.toml`), `save list [IMAGE]`, `save verify`, `save restore

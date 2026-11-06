@@ -152,7 +152,10 @@ modularity rules, [docs/environment.md](docs/environment.md) for the full enviro
 reference (paths, logs, Claude integration, recovery), [docs/dependencies.md](docs/dependencies.md)
 for every dependency, [docs/install-issues.md](docs/install-issues.md) for every
 installation issue met so far, and [docs/claude-integration.md](docs/claude-integration.md)
-for every skill, MCP server, agent and rule Claude Code uses here.
+for every skill, MCP server, agent and rule Claude Code uses here. The phone
+image manager `aodm` (branch `feat/aodm`) is specified in
+[docs/aodm-cli.md](docs/aodm-cli.md) (every command) and
+[docs/phone-image-manager.md](docs/phone-image-manager.md) (internals).
 
 ## UI/UX and code-quality resources
 

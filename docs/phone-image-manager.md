@@ -198,6 +198,9 @@ no TARGETS checks every image.
 ## 9. Security locks *(P5)*
 ## 10. Spin-offs, phone mechanics, switchboard *(P7)*
 ## 11. The ten multi-device features *(P2–P8)*
+
+Superseded by the twenty management and architecture features and the full
+command library in [aodm-cli.md](aodm-cli.md).
 ## 12. Version card *(P2, done)*
 
 `aodm card` (CLI; TUI pane in P8; GUI grid later) renders one data model
