@@ -64,11 +64,19 @@ pub fn pick(
 pub struct PortLock(#[allow(dead_code)] File);
 
 impl PortLock {
-    pub fn acquire(aod_home: &Path) -> Result<PortLock> {
+    /// Takes the lock; calls `waiting` first if another aodm start holds it.
+    pub fn acquire(aod_home: &Path, waiting: impl FnOnce()) -> Result<PortLock> {
         fs::create_dir_all(aod_home).map_err(Error::io(aod_home))?;
         let path = aod_home.join("ports.lock");
         let f = File::create(&path).map_err(Error::io(&path))?;
-        f.lock().map_err(Error::io(&path))?; // waits for a concurrent aodm start
+        match f.try_lock() {
+            Ok(()) => {}
+            Err(std::fs::TryLockError::WouldBlock) => {
+                waiting();
+                f.lock().map_err(Error::io(&path))?;
+            }
+            Err(std::fs::TryLockError::Error(e)) => return Err(Error::Io { path, source: e }),
+        }
         Ok(PortLock(f))
     }
 }
@@ -119,7 +127,7 @@ mod tests {
     #[test]
     fn lock_is_exclusive() {
         let d = tempfile::tempdir().unwrap();
-        let _held = PortLock::acquire(d.path()).unwrap();
+        let _held = PortLock::acquire(d.path(), || panic!("free lock must not wait")).unwrap();
         let other = File::open(d.path().join("ports.lock")).unwrap();
         assert!(other.try_lock().is_err());
     }

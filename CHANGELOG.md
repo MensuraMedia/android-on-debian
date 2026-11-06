@@ -21,7 +21,16 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `~/.cargo/registry`), writes ~90 MB to `tools/aodm/target/` and takes about a
   minute. If `~/.local/bin/aodm` already exists and wasn't installed by adx, it
   is left alone and `devices` reports it (move it away, or `ADX_FORCE=1`).
-- Rolling back to v0.2.0: `./adx devices remove` (deletes only adx's
+- P3 adds on-disk state only when used: `$ADX_AOD_HOME/ports.lock` (creates
+  `~/.local/share/aod/` on the first `aodm start`) and
+  `$ADX_LOG_DIR/emulator-<image>.log` (+ `.1`…) per image. New config keys
+  `ADX_AOD_BASE_PORT`, `ADX_AOD_MAX_INSTANCES`, `ADX_AOD_RAM_RESERVE_MB` have
+  defaults in `defaults.env`; nothing to migrate. With two emulators running,
+  plain `adb` (no `-s`) fails: set `ANDROID_SERIAL` (see the global rules).
+- Rolling back: first `aodm stop` every image except `adx_api37` (older adx
+  and v0.2.0's `adx emulator stop` would kill all emulators, and its
+  screenshot fails with several devices); `ports.lock` and the extra
+  emulator logs can stay or be deleted. To v0.2.0: `./adx devices remove` (deletes only adx's
   `~/.local/bin/aodm`; v0.2.0 would never notice it), `./adx devtools hook remove` (the hook is a no-op on
   v0.2.0 anyway), `rm -rf tools/aodm/target`, `git checkout v0.2.0`. Left
   behind, remove by hand if wanted: Rust toolchain 1.95.0
@@ -96,6 +105,30 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- P3 reviews (code 14 + deployment 11 findings, all fixed):
+  - a failed boot is shut down with console `kill` and SIGTERM, never
+    SIGKILL, and only after the console confirms it's the same image; `stop`
+    checks `avd name` too, so a reused port can't stop another emulator;
+  - an image counts as running only if its emulator holds that image's
+    `multiinstance.lock`: a sandbox (`ANDROID_AVD_HOME`) copy with the same
+    name never stops, restarts or wipes the real one;
+  - the emulator gets the `ANDROID_HOME`/`ANDROID_AVD_HOME`/… aodm resolved,
+    so it boots the image aodm checked even from a shell without them;
+  - running state, locks and the budget are read after taking `ports.lock`
+    (a concurrent start says it is waiting and then sees "already running");
+  - `restart` starts every image that stopped even if one stop fails;
+    `start --wipe` refuses running images instead of reporting success;
+  - registry port pins must be adb slots and unique; a bad
+    `ADX_AOD_BASE_PORT`/`ADX_EMU_PORT` is a config error, not truncated;
+  - tool timeouts also cover pipes held by grandchildren; a panicked worker
+    thread is reported as a failure; console fallbacks and spawned pids are
+    logged; tokens with control characters are rejected and never echoed;
+  - emulator logs keep `ADX_LOG_KEEP` generations like adx;
+    `health --running` with nothing running exits 0;
+  - `adx emulator start` checks `unauthorized` only for its own serial (another
+    image's state no longer aborts it);
+  - `adx check --staged` builds in its own target dir (`target/staged`): a
+    snapshot's test binary was reused by the next working-tree run and failed.
 - P2 reviews (code: 13, deployment: 10 findings), among them:
   - One junk `.ini` (directory, dangling link, non-UTF-8) made `aodm list`
     fail; it is now listed as broken with the reason.

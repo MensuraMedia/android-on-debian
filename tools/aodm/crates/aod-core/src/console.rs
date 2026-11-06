@@ -19,7 +19,8 @@ pub struct Console {
 pub fn token(home: &Path) -> Option<String> {
     let t = std::fs::read_to_string(home.join(".emulator_console_auth_token")).ok()?;
     let t = t.trim();
-    (!t.is_empty()).then(|| t.to_string())
+    // A token with control characters can't be sent as one line (and would end up in errors).
+    (!t.is_empty() && !t.chars().any(char::is_control)).then(|| t.to_string())
 }
 
 impl Console {
@@ -48,9 +49,10 @@ impl Console {
     /// returned as `text`), or the `KO:` reason as an error.
     pub fn command(&mut self, cmd: &str) -> Result<String> {
         if cmd.contains(['\n', '\r']) {
+            // Never echo the command: it may be `auth <token>`.
             return Err(Error::Invalid {
                 what: "console command",
-                detail: format!("{cmd:?} contains a line break"),
+                detail: "contains a line break".into(),
             });
         }
         let port = self.port;
@@ -157,6 +159,8 @@ mod tests {
         assert_eq!(token(d.path()), None);
         std::fs::write(d.path().join(".emulator_console_auth_token"), "\n").unwrap();
         assert_eq!(token(d.path()), None, "empty file: no auth");
+        std::fs::write(d.path().join(".emulator_console_auth_token"), "a\nb").unwrap();
+        assert_eq!(token(d.path()), None, "inner line break rejected");
         std::fs::write(d.path().join(".emulator_console_auth_token"), "abc\n").unwrap();
         assert_eq!(token(d.path()).as_deref(), Some("abc"));
     }

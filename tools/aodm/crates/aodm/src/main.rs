@@ -155,48 +155,77 @@ fn run(cmd: Cmd, env: &Env, log: &Logger) -> anyhow::Result<()> {
         Cmd::Start { targets, opts } => {
             let (images, procs, reg) = inventory(env, log)?;
             let sel = select(&targets, &images, &procs, &reg)?;
-            confirm_wipe(&sel, &opts)?;
-            start(&Ctx::new(env, log), &sel, &images, &procs, &reg, &opts)?;
+            // Running images are refused with --wipe, so only the others are asked about.
+            let stopped: Vec<_> = sel
+                .iter()
+                .copied()
+                .filter(|i| aod_core::emu::running(&procs, i).is_none())
+                .collect();
+            confirm_wipe(&stopped, &opts)?;
+            let ctx = Ctx::new(env, log, say);
+            report(&start(&ctx, &sel, &images, &reg, &opts)?)?;
         }
         Cmd::Stop { targets } => {
             let (images, procs, reg) = inventory(env, log)?;
             let sel = select(&targets, &images, &procs, &reg)?;
-            let running: Vec<_> = sel
-                .iter()
-                .filter_map(|i| proc::running(&procs, &i.name))
-                .collect();
-            for i in sel
-                .iter()
-                .filter(|i| proc::running(&procs, &i.name).is_none())
-            {
-                println!("{}: not running", i.name);
+            let mut out = Vec::new();
+            let mut running = Vec::new();
+            for i in &sel {
+                match aod_core::emu::running(&procs, i) {
+                    Some(p) => running.push(p),
+                    None => out.push(Outcome {
+                        image: i.name.clone(),
+                        result: Ok(not_running(i, &procs)),
+                    }),
+                }
             }
-            report(&lifecycle::stop(&Ctx::new(env, log), &running))?;
+            out.extend(lifecycle::stop(&Ctx::new(env, log, say), &running));
+            report(&out)?;
         }
         Cmd::Restart { targets, opts } => {
             let (images, procs, reg) = inventory(env, log)?;
             let sel = select(&targets, &images, &procs, &reg)?;
             confirm_wipe(&sel, &opts)?;
-            let ctx = Ctx::new(env, log);
+            let ctx = Ctx::new(env, log, say);
             let running: Vec<_> = sel
                 .iter()
-                .filter_map(|i| proc::running(&procs, &i.name))
+                .filter_map(|i| aod_core::emu::running(&procs, i))
                 .collect();
-            report(&lifecycle::stop(&ctx, &running))?;
-            start(&ctx, &sel, &images, &proc::emulators(), &reg, &opts)?;
+            let stopped = lifecycle::stop(&ctx, &running);
+            // One stuck emulator must not leave the rest of the group down: start every
+            // image that is stopped now, report the failed stops alongside.
+            let failed: Vec<&str> = stopped
+                .iter()
+                .filter(|o| o.result.is_err())
+                .map(|o| o.image.as_str())
+                .collect();
+            let again: Vec<_> = sel
+                .iter()
+                .copied()
+                .filter(|i| !failed.contains(&i.name.as_str()))
+                .collect();
+            let mut out: Vec<Outcome> = stopped.into_iter().filter(|o| o.result.is_err()).collect();
+            if !again.is_empty() {
+                out.extend(start(&ctx, &again, &images, &reg, &opts)?);
+            }
+            report(&out)?;
         }
         Cmd::Health { targets } => {
             let (images, procs, reg) = inventory(env, log)?;
-            let sel = if targets.names.is_empty()
-                && !targets.all
-                && targets.group.is_none()
-                && !targets.running
-            {
-                images.iter().collect() // no selector: every image
+            let sel = if targets.names.is_empty() && !targets.all && targets.group.is_none() {
+                // No selector: every image (or, with --running alone, every running one).
+                images
+                    .iter()
+                    .filter(|i| !targets.running || aod_core::emu::running(&procs, i).is_some())
+                    .collect()
             } else {
                 select(&targets, &images, &procs, &reg)?
             };
-            let rows = lifecycle::health(&Ctx::new(env, log), &sel, &procs);
+            if sel.is_empty() {
+                println!("no {}images", if targets.running { "running " } else { "" });
+                return Ok(());
+            }
+            let rows = lifecycle::health(&Ctx::new(env, log, say), &sel, &procs);
             let bad = rows.iter().filter(|h| !h.ok).count();
             log.info(&format!(
                 "health: {} image(s), {bad} need attention",
@@ -211,29 +240,33 @@ fn run(cmd: Cmd, env: &Env, log: &Logger) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn say(msg: &str) {
+    eprintln!("aodm: {msg}");
+}
+
+fn not_running(i: &avd::Image, procs: &[proc::EmuProc]) -> String {
+    if proc::running(procs, &i.name).is_some() {
+        "not running here (a same-named emulator from another AVD home is; not touched)".into()
+    } else {
+        "not running".into()
+    }
+}
+
 fn start(
     ctx: &Ctx,
     sel: &[&avd::Image],
     images: &[avd::Image],
-    procs: &[proc::EmuProc],
     reg: &Registry,
     opts: &StartOpts,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<Outcome>> {
     let mut launch = ctx.launch(opts.window)?;
     launch.cold = opts.cold;
     launch.wipe = opts.wipe;
-    let to_boot = sel
-        .iter()
-        .filter(|i| proc::running(procs, &i.name).is_none())
-        .count();
-    if to_boot > 0 {
-        println!("starting {to_boot} image(s); booting takes a minute or more ...");
-    }
-    let (warnings, out) = lifecycle::start(ctx, sel, images, procs, reg, &launch)?;
+    let (warnings, out) = lifecycle::start(ctx, sel, images, reg, &launch)?;
     for w in warnings {
         eprintln!("aodm: warning: {w}");
     }
-    report(&out)
+    Ok(out)
 }
 
 /// Prints one line per image; fails if any image failed.
@@ -256,7 +289,7 @@ fn report(out: &[Outcome]) -> anyhow::Result<()> {
 
 /// --wipe destroys user data: confirm by typing `wipe`, or pass --yes.
 fn confirm_wipe(sel: &[&avd::Image], opts: &StartOpts) -> anyhow::Result<()> {
-    if !opts.wipe || opts.yes {
+    if !opts.wipe || opts.yes || sel.is_empty() {
         return Ok(());
     }
     let names = sel
@@ -299,11 +332,14 @@ fn select<'a>(
                     .is_some_and(|g| reg.groups(&i.name).contains(g))
                 || (any && t.names.is_empty() && t.group.is_none())
         })
-        .filter(|i| !t.running || proc::running(procs, &i.name).is_some())
+        .filter(|i| !t.running || aod_core::emu::running(procs, i).is_some())
         .collect();
     if sel.is_empty() {
         if t.names.is_empty() && !any && t.group.is_none() {
             anyhow::bail!("which images? give names, --all, --group G or --running");
+        }
+        if t.running {
+            anyhow::bail!("no matching images (--running: none of them is running)");
         }
         anyhow::bail!("no matching images");
     }

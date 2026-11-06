@@ -16,6 +16,7 @@ emulator through mobile-mcp only when needed.
 | Launch the app | `adb shell am start -n @@APP_PACKAGE@@/.MainActivity` |
 | Start / stop headless emulator | `adx emulator start` / `adx emulator stop` |
 | Crash logs | `adb logcat -d *:E` |
+| Several emulators running | `export ANDROID_SERIAL=emulator-5554` first (serials: `aodm health`), else plain `adb` fails |
 
 ## UI workflow
 

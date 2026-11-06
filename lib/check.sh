@@ -73,8 +73,12 @@ _chk_rust() {
   local tc; tc="$(sed -nE 's/^channel = "([^"]+)"/\1/p' "$ws/rust-toolchain.toml")"
   if [ "$tc" = "$ADX_RUST_TOOLCHAIN" ]; then _ok "toolchain pins agree ($tc)"
   else _fail "rust-toolchain.toml ($tc) != ADX_RUST_TOOLCHAIN ($ADX_RUST_TOOLCHAIN)"; fi
-  # Same target dir as the working tree, so a staged snapshot reuses the build cache.
-  local c=(env CARGO_HOME="$ADX_CARGO_HOME" CARGO_TARGET_DIR="$ADX_ROOT/tools/aodm/target" "$cargo")
+  # A staged snapshot gets its own target dir: sharing the working tree's let cargo
+  # treat the snapshot's test binary as the tree's (same relative paths), so the
+  # next working-tree run tested a deleted /tmp snapshot. Both caches persist.
+  local target="$ADX_ROOT/tools/aodm/target"
+  [ "$_chk_mode" = staged ] && target="$target/staged"
+  local c=(env CARGO_HOME="$ADX_CARGO_HOME" CARGO_TARGET_DIR="$target" "$cargo")
   if (cd "$ws" && "${c[@]}" fmt --all --check >/dev/null 2>&1); then _ok "cargo fmt"; else _fail "cargo fmt --check (run: cargo fmt --all)"; fi
   if (cd "$ws" && "${c[@]}" clippy --all-targets --locked -q -- -D warnings); then _ok "cargo clippy -D warnings"; else _fail "cargo clippy"; fi
   local out

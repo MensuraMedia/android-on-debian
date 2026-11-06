@@ -254,7 +254,7 @@ pub fn build(
         .iter()
         .map(|i| ImageRow {
             name: i.name.clone(),
-            state: crate::proc::running(procs, &i.name)
+            state: crate::emu::running(procs, i)
                 .map(|p| match p.port {
                     Some(port) => format!("running :{port}"),
                     None => "running".into(),

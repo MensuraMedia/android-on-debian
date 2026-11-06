@@ -298,7 +298,8 @@ mod tests {
     }
 
     fn repo_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
+        // Runtime, not env!(): a binary built in a (deleted) snapshot must not point there.
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
             .join("../../../..")
             .canonicalize()
             .unwrap()

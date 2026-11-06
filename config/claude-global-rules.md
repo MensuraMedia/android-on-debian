@@ -53,3 +53,6 @@ Every project gets structured, filterable logging, not ad-hoc prints:
   `emulator` command, so config, logging and crash detection apply.
 - Move the emulator's GPS with `adb emu geo fix <lon> <lat>`; mobile-mcp's
   `mobile_set_location` does not move it.
+- With more than one emulator running (`aodm start`), plain `adb` fails with
+  "more than one device/emulator": use `adb -s emulator-5554 …` (see
+  `aodm health` for serials) or `export ANDROID_SERIAL=emulator-5554`.

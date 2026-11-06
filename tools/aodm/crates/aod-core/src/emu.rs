@@ -22,8 +22,11 @@ pub struct Launch {
     pub cold: bool,
     /// `--wipe`: factory reset (destroys the image's user data).
     pub wipe: bool,
-    /// Extra environment for the emulator process only (ADX_EMU_ENV).
+    /// Environment for the emulator process: the SDK and AVD locations aodm resolved
+    /// (adx exports its whole config; aodm passes what the emulator reads), then ADX_EMU_ENV.
     pub env: Vec<(String, String)>,
+    /// Previous emulator logs kept (ADX_LOG_KEEP, as adx).
+    pub log_keep: u64,
 }
 
 /// `ADX_EMU_ENV`: space-separated `VAR=value` pairs (no spaces inside values), as in adx.
@@ -75,12 +78,12 @@ pub fn log_path(log_dir: &Path, image: &str) -> PathBuf {
 }
 
 /// Starts the emulator detached (own process group: Ctrl-C or closing aodm's
-/// terminal doesn't kill it). The previous run's log is kept as `.1`.
+/// terminal doesn't kill it). Previous runs' logs are kept as `.1`… like adx.
 pub fn spawn(emulator: &Path, image: &str, port: u16, l: &Launch, log: &Path) -> Result<Child> {
     if let Some(d) = log.parent() {
         fs::create_dir_all(d).map_err(Error::io(d))?;
     }
-    crate::log::shift(log, 1).map_err(Error::io(log))?;
+    crate::log::shift(log, l.log_keep).map_err(Error::io(log))?;
     let out = File::create(log).map_err(Error::io(log))?;
     let err = out.try_clone().map_err(Error::io(log))?;
     Command::new(emulator)
@@ -133,39 +136,57 @@ pub fn wait_boot(
 #[derive(Debug, PartialEq, Eq)]
 pub enum Stopped {
     Console,
-    Sigterm,
+    /// SIGTERM after the console path failed, with why.
+    Sigterm(String),
 }
 
 /// Stops one running emulator: console `kill` (the emulator saves its quick-boot
-/// snapshot), then SIGTERM if it is still alive after `grace`. Never SIGKILL: that can
-/// corrupt the image; a stuck emulator is reported instead.
+/// snapshot) once the console confirms it is `p.avd`, then SIGTERM if it is still
+/// alive after `grace`. Never SIGKILL: that can corrupt the image; a stuck emulator
+/// is reported instead.
 pub fn stop(p: &EmuProc, token: Option<&str>, grace: Duration) -> Result<Stopped> {
-    if let Some(port) = p.port
-        && let Ok(mut c) = Console::connect(port, token, Duration::from_secs(5))
-    {
-        let _ = c.command("kill");
-        if wait_gone(p, grace) {
-            return Ok(Stopped::Console);
-        }
+    let why = match p.port {
+        None => "no console port known".to_string(),
+        Some(port) => match Console::connect(port, token, Duration::from_secs(5))
+            .and_then(|mut c| Ok((c.command("avd name")?, c)))
+        {
+            // Another emulator may hold the port by now: only kill the one we mean.
+            Ok((name, _)) if name.trim() != p.avd => {
+                format!("console :{port} answers as '{}'", name.trim())
+            }
+            Ok((_, mut c)) => match c.command("kill") {
+                Ok(_) | Err(Error::Io { .. }) if wait_gone(p, grace) => {
+                    return Ok(Stopped::Console);
+                }
+                Ok(_) => format!("still running {} s after console kill", grace.as_secs()),
+                Err(e) => format!("console kill: {e}"),
+            },
+            Err(e) => format!("console: {e}"),
+        },
+    };
+    if !still_running(p) {
+        return Ok(Stopped::Sigterm(format!("{why} (it exited anyway)")));
     }
     let pid = rustix::process::Pid::from_raw(p.pid as i32)
         .ok_or_else(|| Error::Refused(format!("bad pid {}", p.pid)))?;
-    if still_running(p) {
-        rustix::process::kill_process(pid, rustix::process::Signal::TERM).map_err(|e| {
-            Error::Io {
-                path: format!("pid {}", p.pid).into(),
-                source: e.into(),
-            }
-        })?;
-    }
+    rustix::process::kill_process(pid, rustix::process::Signal::TERM).map_err(|e| Error::Io {
+        path: format!("pid {}", p.pid).into(),
+        source: e.into(),
+    })?;
     if wait_gone(p, Duration::from_secs(15)) {
-        Ok(Stopped::Sigterm)
+        Ok(Stopped::Sigterm(why))
     } else {
         Err(Error::Refused(format!(
-            "{} (pid {}) did not exit after SIGTERM; check it, then `kill -9 {}` as a last resort",
+            "{} (pid {}) did not exit after SIGTERM ({why}); check it, then `kill -9 {}` as a last resort",
             p.avd, p.pid, p.pid
         )))
     }
+}
+
+/// The running emulator of this image: a same-named emulator only counts if it holds
+/// this image's `multiinstance.lock` (one from another AVD home, e.g. a sandbox, doesn't).
+pub fn running<'a>(procs: &'a [EmuProc], image: &crate::avd::Image) -> Option<&'a EmuProc> {
+    proc::running(procs, &image.name).filter(|_| in_use(&image.dir))
 }
 
 /// The same emulator still holds this pid (guards against pid reuse).

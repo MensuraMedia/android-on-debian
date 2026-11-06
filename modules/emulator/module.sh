@@ -132,7 +132,7 @@ mod_start() {
   # Poll instead of `adb wait-for-device` so a crashed emulator fails fast.
   until [ "$(_adb -s "emulator-$ADX_EMU_PORT" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
     kill -0 "$pid" 2>/dev/null || adx_die "emulator exited during boot — see $(_log); retry, or use --wipe if it keeps failing"
-    if [ $((SECONDS - t0)) -ge 60 ] && _adb devices | grep -q '^emulator-.*unauthorized'; then
+    if [ $((SECONDS - t0)) -ge 60 ] && _adb -s "emulator-$ADX_EMU_PORT" get-state 2>&1 | grep -q unauthorized; then
       adx_die "device is 'unauthorized' (user data from a crashed boot?) — run: adx emulator stop && adx emulator start --wipe"
     fi
     [ $((SECONDS - t0)) -ge "$ADX_EMU_BOOT_TIMEOUT" ] && adx_die "boot timed out — see $(_log)"

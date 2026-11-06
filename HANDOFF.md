@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-06 (v0.2.0)
+# Handoff — updated 2026-11-06 (v0.2.0 released; branch `feat/aodm` at P3)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -17,7 +17,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Claude integration | Global rules + `adversarial-reviewer` agent via `claude-rules`; mobile-mcp pinned 1.0.16 |
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
-| Phone image manager | Branch `feat/aodm` (P3): `aodm list`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--running`); installed by `adx devices install`; 51 unit tests; lifecycle verified on the real emulator (two images on 5554/5556). Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
+| Phone image manager | Branch `feat/aodm` (P3): `aodm list`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--running`); installed by `adx devices install`; 55 unit tests; lifecycle verified on the real emulator (two images on 5554/5556). Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
 | Push | `feat/aodm` is local only: the GitHub token lacks the `workflow` scope (the branch changes `.github/workflows/`). Fix: `gh auth refresh -h github.com -s workflow`, then `git push -u origin feat/aodm` |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
@@ -28,6 +28,19 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - User is in the `kvm` group but this login predates it: log out and back in once.
 - Menu entry installed (`adx emulator desktop`).
 
+## Known issues
+
+- `feat/aodm` isn't pushed: the token lacks the `workflow` scope (see State).
+- `config/claude-global-rules.md` gained an `ANDROID_SERIAL` note (several
+  emulators break plain `adb`); it reaches `~/.claude/CLAUDE.md` only after the
+  owner runs `adx claude-rules install`.
+- `aodm stop --all` / `--running` include `adx_api37` (the emulator
+  mobile-mcp uses): by design, `--all` means all; name images to spare it.
+- Lifecycle orchestration has no automated fake-SDK test yet (end-to-end
+  checks on the real emulator only); planned with P4's integration tests.
+- The `deploy-reviewer` agent isn't loaded in sessions started before it was
+  installed; such sessions run it through a general agent with its file.
+
 ## Next steps
 
 1. **Phone image manager (Rust)** on branch `feat/aodm`: plan approved; P0
@@ -35,8 +48,8 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
    done and reviewed (30 findings fixed); P2 (inventory, process detection,
    registry, version card, `devices` module) done and reviewed (23 findings
    fixed); P3 (ports, start/stop/restart/health, budget, adb + console
-   clients) done and verified end to end on the real emulator, reviews
-   pending; next P4 (full-copy saves, clone, rename, delete). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
+   clients) done, reviewed (25 findings fixed) and verified end to end on
+   the real emulator; next P4 (full-copy saves, clone, rename, delete). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
 2. Decide the permission-allowlist items in Open questions, then apply them in
    `templates/claude/settings.json` and let `claude-permissions` tighten rules.
 3. Push to `LinearGenetics/android-on-debian` once the account has write access
