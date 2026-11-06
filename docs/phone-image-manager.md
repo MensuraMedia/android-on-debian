@@ -73,8 +73,10 @@ reason here and in [dependencies.md](dependencies.md), passes `cargo deny`
 
 ## 15. Testing *(every phase)*
 
-P1: 12 unit tests (config precedence, real framework config sourced, log
-format and rotation, lossless ini round trip / set / atomic save). Run:
+P1: 18 unit tests (config precedence, rejected root, config errors reported,
+fallbacks equal defaults.env, log format/sanitising/rotation incl. keep=0,
+lossless ini round trip / set / injection rejected / CRLF+BOM / durable save
+keeping mode and symlinks). Run:
 `cd tools/aodm && cargo test --locked`, or `adx check`.
 
 ## 16. Change pipeline *(P1, in progress)*
@@ -102,6 +104,7 @@ format and rotation, lossless ini round trip / set / atomic save). Run:
 | 2026-11-06 | Plan | Rust; CLI+TUI first, GUI later; full-copy saves; identity policies; spin-offs; templates; change pipeline |
 | 2026-11-06 | P0 | Spike results: see research/aodm-spike.md (IMEI/serial/SIM fixed by emulator; Android ID must be regenerated on copies; console-driven calls/SMS) |
 | 2026-11-06 | P1 | Gate's own first run found and fixed: new files not scanned for secrets; secrets echoed into the log |
+| 2026-11-06 | P1 review | adversarial-reviewer (21 findings) and deploy-reviewer (9 findings), all fixed; reproductions replayed in a clean clone: staged-snapshot gate, secret kinds, section continuation, shallow clone, pipe-to-shell forms, hook ownership |
 
 ## 18. Known limits (`shortcut:` ledger)
 
