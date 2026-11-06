@@ -20,6 +20,21 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Technical document `docs/phone-image-manager.md` with flat dark diagrams.
 
 ### Added
+- `adx check [--staged|--full]` (`lib/check.sh`): one quality gate for local,
+  pre-commit and CI: shell (`bash -n`, ShellCheck), Rust (fmt, clippy, test,
+  cargo deny), docs (relative links, documented commands exist, stale terms),
+  process (CHANGELOG with code changes, HANDOFF current), security (secrets in
+  the diff incl. new files, masked; no pipe-to-shell; every download
+  checksum-verified; permission/rules/agent changes flagged for owner approval).
+- `devtools` module: ShellCheck 0.11.0 and cargo-deny 0.20.2 (SHA-256 pinned),
+  `adx devtools hook` for a pre-commit `adx check --staged`.
+- `rust` module: Rust 1.95.0 via rustup (rustup-init 1.29.3 SHA-256 pinned,
+  reuses an existing rustup, never self-updates).
+- `deploy-reviewer` agent (installed by `claude-rules`) and the
+  `review-change` workflow (`.claude/workflows/review-change.js`).
+- `tools/aodm` Cargo workspace: `aod-core` (`env`, `log`, `ini`, `error`, 12
+  tests) and `aodm` (`--version`, `env`); `deny.toml` dependency policy.
+- `docs/phone-image-manager.md`: technical document (filled per phase).
 - `ROADMAP.md`: shipped, pending (in progress, planned, decision needed) and
   future features in one place.
 - `diagram-design` skill (cathrynlavery/diagram-design, pinned f24d98b) for
@@ -35,12 +50,21 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- New apps from the template failed `verifyRoborazziDebug` (baselines moved
+  into git in 0.2.0, but a new app has none yet). The scaffolder now says to
+  record and commit baselines first; `adx check --full` records then verifies.
 - `adx emulator stop` killed every running emulator; it now stops only
   `emulator-$ADX_EMU_PORT` (other images keep running).
 - `adx emulator screenshot` failed with more than one device; it now targets
   its own serial and fails with a clear message.
 
 ### Changed
+- CI runs `adx check` (same gate as local) with a read-only token,
+  `actions/checkout` pinned by commit SHA and tools from the framework's own
+  pinned modules.
+- Default profile adds `rust` and `devtools`; `render-only` adds `devtools`.
+- New config keys: `ADX_RUST_*`, `ADX_RUSTUP_*`, `ADX_CARGO_HOME`,
+  `ADX_SHELLCHECK_*`, `ADX_CARGO_DENY_*`, `ADX_AOD_*`.
 - Vendored skills in the framework repo are git-ignored (`adx skills apply .`
   recreates them from the pinned manifest).
 

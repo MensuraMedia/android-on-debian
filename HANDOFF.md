@@ -28,9 +28,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Next steps
 
-1. **Phone image manager (Rust)**, requested 2026-11-06: manage multiple AVDs
-   (create, save, reopen, apply settings to one or all), top-10 device
-   management features, version card, technical document. Planning first.
+1. **Phone image manager (Rust)** on branch `feat/aodm`: plan approved; P0
+   (spike) and P1 (gate, devtools, rust, agents, workflow, CI, workspace core)
+   done; next P2 (inventory, process detection, registry, version card,
+   `devices` module). Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
 2. Decide the permission-allowlist items in Open questions, then apply them in
    `templates/claude/settings.json` and let `claude-permissions` tighten rules.
 3. Push to `LinearGenetics/android-on-debian` once the account has write access

@@ -5,6 +5,8 @@ jdk
 shell-env
 sdk
 emulator
+rust
+devtools
 gradle
 node
 mobile-mcp

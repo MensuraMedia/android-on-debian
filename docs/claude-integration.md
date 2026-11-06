@@ -54,7 +54,7 @@ pinning (third-party text becomes instructions to Claude).
 | Agent | File (source → installed) | Purpose | Tools |
 | --- | --- | --- | --- |
 | `adversarial-reviewer` | `templates/claude/agents/adversarial-reviewer.md` → `~/.claude/agents/` | Read-only scrutiny of a segment (installation, build, configuration, design, security, docs); ranked findings with evidence and minimal fixes | Read, Grep, Glob, Bash (read-only by instruction) |
-| `deploy-reviewer` *(planned, P1)* | same pattern | Scrutinises how a change lands: upgrade, migration, rollback, clean install, CI parity, blast radius | read-only |
+| `deploy-reviewer` | `templates/claude/agents/deploy-reviewer.md` → `~/.claude/agents/` | Scrutinises how a change lands: upgrade, idempotency, migration, rollback, clean install, blast radius, CI parity, release hygiene; gives a rollout plan | Read, Grep, Glob, Bash (read-only by instruction) |
 
 Installed and checked by the `claude-rules` module (`adx claude-rules install|status`);
 an edited copy in `~/.claude/agents/` is kept as `.bak` before replacement.
@@ -88,7 +88,7 @@ HANDOFF open questions. Not changed without the owner's approval.
 
 | Workflow | Status | Purpose |
 | --- | --- | --- |
-| `review-change` | planned (P1) | Map changed paths to segments, run reviewer agents in parallel, verify findings, gate releases |
+| `review-change` | `.claude/workflows/review-change.js` (framework repo) | Scope changed files into segments → `adversarial-reviewer` per segment + `deploy-reviewer` → two skeptics per finding → confirmed list. Run: "run the review-change workflow" (args `{range: "v0.2.0..HEAD"}`); needs both agents installed |
 
 ## 7. Check everything
 

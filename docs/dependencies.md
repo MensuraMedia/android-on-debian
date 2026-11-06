@@ -67,6 +67,9 @@ sudo usermod -aG kvm "$USER"     # then log out and back in
 | Gradle (bootstrap only) | 9.8.2 | Gradle cache | `gradle` | R (new apps) | services.gradle.org, SHA-256 |
 | Node.js | 26.13.0 LTS (min major 20) | `~/.local/opt/node-v…`, links in `~/.local/bin` | `node` | R (mobile-mcp) | nodejs.org, SHA-256 from SHASUMS256.txt |
 | Claude Code CLI | user-installed (2.1.x) | `~/.local/bin/claude` | — (prerequisite) | R (agent workflow) | claude.com |
+| Rust toolchain | 1.95.0 via rustup 1.29.3 (rustup-init SHA-256 pinned) | `~/.cargo`, `~/.rustup` (not on PATH; modules use full paths) | `rust` | R (aodm) | static.rust-lang.org |
+| ShellCheck | 0.11.0 (static binary) | `~/.local/opt/shellcheck-0.11.0`, link in `~/.local/bin` | `devtools` | R (adx check) | GitHub release, SHA-256 pinned |
+| cargo-deny | 0.20.2 (musl binary) | `~/.local/opt/cargo-deny-0.20.2`, link in `~/.local/bin` | `devtools` | R (adx check) | GitHub release, SHA-256 pinned |
 | Android Studio | dormant | `~/.local/opt/android-studio` | `studio` (manual) | O | developer.android.com |
 
 ## 4. Claude Code integration
@@ -96,6 +99,18 @@ Platform APIs the example app uses instead of extra libraries:
 `HttpURLConnection` (HTTP), `org.json` (JSON), `LocationManager` +
 `Geocoder` (location), `java.time` (dates), `android.util.Log` via `AppLog`
 (logging), kotlinx-coroutines (transitive from Compose).
+
+## 5b. aodm crates (tools/aodm, `Cargo.lock` committed)
+
+| Crate | Version | Scope | Purpose |
+| --- | --- | --- | --- |
+| clap | 4.6.7 (derive, default features off) | aodm | CLI |
+| anyhow | 1.0.104 | aodm | error context |
+| thiserror | 2.0.21 | aod-core | typed errors |
+| jiff | 0.2.39 | aod-core | log timestamps |
+| tempfile | 3 | dev | test fixtures |
+
+Policy (`tools/aodm/deny.toml`, checked by `adx check`): crates.io only, no wildcards, licences MIT / Apache-2.0 / Unicode-3.0, yanked crates denied.
 
 ## 6. External services
 
