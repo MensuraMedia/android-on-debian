@@ -75,7 +75,7 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 | RAM | 16 GB recommended | Emulator + Gradle daemon |
 | Disk | ~15 GB | SDK, system image, Gradle caches |
 | Base tools | `bash curl wget unzip git jq perl` | Usually preinstalled |
-| Node.js | 18+ with `npx` | Only for mobile-mcp |
+| Node.js | 18+ with `npx` | Only for mobile-mcp; `adx up` stops at that module without it (user-level install: see [troubleshooting](docs/troubleshooting.md)) |
 | Claude Code | `claude` CLI | For the MCP server, skills and permissions |
 | KVM | read/write access to `/dev/kvm` | `sudo usermod -aG kvm $USER`, then log out and back in |
 
@@ -109,7 +109,7 @@ Common actions:
 | Command | Effect |
 | --- | --- |
 | `adx app-template new <Name> <package> [dir]` | Scaffold an app (permissions, skills, wrapper, git init) |
-| `adx emulator start [--window]` / `stop` | Boot or stop the AVD (headless unless `--window`) |
+| `adx emulator start [--window] [--wipe]` / `stop` | Boot or stop the AVD (headless unless `--window`; `--wipe` factory-resets its data) |
 | `adx emulator screenshot [file]` | Save the emulator screen to a PNG |
 | `adx emulator accel` | Check KVM acceleration |
 | `adx sdk add "platforms;android-36"` | Install extra SDK packages |

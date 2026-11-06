@@ -34,3 +34,18 @@ emulator through mobile-mcp only when needed.
 - Composables take state as parameters (e.g. `initialCount`) so tests can
   render any state without the emulator.
 - Do not commit `local.properties`, keystores or signing passwords.
+
+## Logging
+
+All logging goes through `AppLog` (`app/src/main/kotlin/.../AppLog.kt`), tagged
+`@@APP_NAME@@/<area>`. Log every network call (URL, status, size, duration),
+permission/config decisions, fallbacks, state changes and caught errors; use
+`AppLog.timed` for slow work. Never log secrets. Read logs with
+`adb logcat -d | grep '@@APP_NAME@@/'`, and read them first when debugging.
+
+## Changelog and handoff (mandatory)
+
+- `CHANGELOG.md` (Keep a Changelog): add an `[Unreleased]` entry in the same
+  piece of work as every change.
+- `HANDOFF.md`: keep State, How to run/test, Known issues, Next steps and Open
+  questions current; update before ending any session that changed something.

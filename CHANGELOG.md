@@ -7,10 +7,25 @@ the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- App template (`compose-roborazzi`) now ships `CHANGELOG.md`, `HANDOFF.md`
+  and `AppLog.kt` (logging tagged `<AppName>/<area>` with `AppLog.timed`), and
+  its `CLAUDE.md` makes logging, changelog and handoff upkeep mandatory.
+- `adx emulator start --wipe`: factory-reset the AVD's user data on boot.
+- `ADX_EMU_ENV` (`config/defaults.env`): extra environment for the emulator
+  process only, e.g. NVIDIA PRIME offload on hybrid Intel + NVIDIA laptops.
+- Troubleshooting entries: first-boot segfault on hybrid GPUs, `unauthorized`
+  devices, user-level Node.js install, non-interactive shells, KVM via logind
+  ACL only, and tap coordinates.
 - `docs/examples/meridian-weather/`: first example app (Compose weather app built
   with the framework) with six Roborazzi mockups.
 
+### Changed
+- `adx emulator start` rejects unknown options.
+
 ### Fixed
+- `adx emulator start` fails within seconds if the emulator process dies
+  during boot (it used to wait the full `ADX_EMU_BOOT_TIMEOUT`), and stops
+  with a `--wipe` hint when the device stays `unauthorized` for 60 s.
 - CI: add `.shellcheckrc` (bash dialect; SC2034 disabled for module contract
   variables read by the dispatcher).
 

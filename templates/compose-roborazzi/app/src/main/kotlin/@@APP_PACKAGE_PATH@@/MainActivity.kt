@@ -10,6 +10,7 @@ import @@APP_PACKAGE@@.ui.theme.AppTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLog.i("UI", "MainActivity created (restored=${savedInstanceState != null})")
         enableEdgeToEdge()
         setContent {
             AppTheme {

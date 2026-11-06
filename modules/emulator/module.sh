@@ -28,20 +28,35 @@ mod_create() {
   adx_log "created avd $ADX_AVD_NAME"
 }
 
-# adx emulator start [--window]
+# adx emulator start [--window] [--wipe]
+#   --wipe  factory-reset the AVD's user data (fixes a device left
+#           "unauthorized" by a crashed first boot)
 mod_start() {
-  local flags=(-avd "$ADX_AVD_NAME" -gpu "$ADX_EMU_GPU" -no-boot-anim)
-  if [ "${1:-}" != "--window" ] && [ "$ADX_EMU_HEADLESS" = true ]; then flags+=(-no-window -no-audio); fi
+  local flags=(-avd "$ADX_AVD_NAME" -gpu "$ADX_EMU_GPU" -no-boot-anim) window=false a
+  for a in "$@"; do
+    case "$a" in
+      --window) window=true ;;
+      --wipe)   flags+=(-wipe-data) ;;
+      *)        adx_die "unknown option '$a' (usage: adx emulator start [--window] [--wipe])" ;;
+    esac
+  done
+  if [ "$window" = false ] && [ "$ADX_EMU_HEADLESS" = true ]; then flags+=(-no-window -no-audio); fi
   if _adb devices | grep -q '^emulator-'; then adx_log "an emulator is already running"; return 0; fi
   mkdir -p "$ADX_DOWNLOADS"
   adx_log "starting $ADX_AVD_NAME (log: $(_log))"
-  local t0=$SECONDS
-  nohup "$ANDROID_HOME/emulator/emulator" "${flags[@]}" >"$(_log)" 2>&1 &
-  timeout "$ADX_EMU_BOOT_TIMEOUT" "$ANDROID_HOME/platform-tools/adb" wait-for-device \
-    || adx_die "no device after ${ADX_EMU_BOOT_TIMEOUT}s — see $(_log)"
+  local t0=$SECONDS pid
+  # ADX_EMU_ENV is a space-separated VAR=value list; word splitting is intended.
+  # shellcheck disable=SC2086
+  nohup env $ADX_EMU_ENV "$ANDROID_HOME/emulator/emulator" "${flags[@]}" >"$(_log)" 2>&1 &
+  pid=$!
+  # Poll instead of `adb wait-for-device` so a crashed emulator fails fast.
   until [ "$(_adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
-    sleep 2
+    kill -0 "$pid" 2>/dev/null || adx_die "emulator exited during boot — see $(_log); retry, or use --wipe if it keeps failing"
+    if [ $((SECONDS - t0)) -ge 60 ] && _adb devices | grep -q '^emulator-.*unauthorized'; then
+      adx_die "device is 'unauthorized' (user data from a crashed boot?) — run: adx emulator stop && adx emulator start --wipe"
+    fi
     [ $((SECONDS - t0)) -ge "$ADX_EMU_BOOT_TIMEOUT" ] && adx_die "boot timed out — see $(_log)"
+    sleep 2
   done
   adx_log "booted in ~$((SECONDS - t0))s: $(_adb devices | grep '^emulator-' | cut -f1)"
 }
