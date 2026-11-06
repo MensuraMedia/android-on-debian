@@ -7,6 +7,7 @@ sdk
 emulator
 rust
 devtools
+devices
 gradle
 node
 mobile-mcp

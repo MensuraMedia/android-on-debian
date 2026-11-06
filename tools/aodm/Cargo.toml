@@ -15,7 +15,10 @@ aod-core = { path = "crates/aod-core" }
 anyhow = "1.0.104"
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 jiff = "0.2.39"
+rustix = { version = "1.1.6", features = ["fs"] }
+serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
+toml = "1.2.0"
 tempfile = "3"
 
 [workspace.lints.rust]

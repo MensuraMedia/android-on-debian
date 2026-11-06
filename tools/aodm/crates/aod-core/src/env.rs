@@ -1,11 +1,14 @@
 //! Configuration, with one source of truth: `config/defaults.env` + `config/local.env`.
 //!
-//! Precedence per key:
-//! 1. the process environment (under `adx`, or a shell that sourced `lib/shell-env.sh`,
-//!    this already equals the config files);
-//! 2. the config files, sourced through bash when the framework is found
-//!    (`ADX_ROOT` in the environment, else the root baked in at build time);
-//! 3. built-in fallbacks (only when neither is available).
+//! Same precedence as `adx` itself:
+//! 1. the config files, sourced through bash with the real environment (so a value
+//!    written as `${VAR:-default}` in defaults.env honours `VAR` from the environment,
+//!    exactly as under adx). A stale shell environment can't override them.
+//! 2. the process environment, for keys the config files don't set (e.g. `ANDROID_AVD_HOME`);
+//! 3. built-in fallbacks, when the framework isn't found at all (standalone binary).
+//!
+//! The framework is found via `ADX_ROOT` in the environment, else the root baked in at
+//! build time.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -85,17 +88,15 @@ impl Env {
                     .map(str::to_string)
                     .filter(|r| is_root(r))
             });
-        // Under adx the process env already holds the config; skip the bash round trip.
-        let (config, config_error) = match (&root, process.contains_key("ADX_LOG_DIR")) {
-            (Some(r), false) => match source_config(Path::new(r)) {
+        let (config, config_error) = match &root {
+            Some(r) => match source_config(Path::new(r), &process) {
                 Ok(c) => (c, None),
                 Err(e) => (HashMap::new(), Some(e)),
             },
-            (None, _) => (
+            None => (
                 HashMap::new(),
                 Some("framework not found (ADX_ROOT unset or invalid); using fallbacks".into()),
             ),
-            _ => (HashMap::new(), None),
         };
         let home = process.get("HOME").cloned().unwrap_or_default();
         let mut env = Env::resolve(&process, &config, root.as_deref(), &home);
@@ -127,15 +128,15 @@ impl Env {
                     value: root.unwrap_or_default().to_string(),
                     source,
                 }
-            } else if let Some(v) = process.get(*key) {
-                Value {
-                    value: v.clone(),
-                    source: Source::Process,
-                }
             } else if let Some(v) = config.get(*key) {
                 Value {
                     value: v.clone(),
                     source: Source::Config,
+                }
+            } else if let Some(v) = process.get(*key) {
+                Value {
+                    value: v.clone(),
+                    source: Source::Process,
                 }
             } else {
                 Value {
@@ -172,31 +173,23 @@ impl Env {
     }
 }
 
-/// Variables the config files may use (XDG paths) or need, passed through to bash.
-const PASS_THROUGH: &[&str] = &[
-    "HOME",
-    "USER",
-    "LANG",
-    "XDG_DATA_HOME",
-    "XDG_STATE_HOME",
-    "XDG_CONFIG_HOME",
-    "XDG_CACHE_HOME",
-];
-
-/// Sources defaults.env then local.env in bash (the framework's own semantics) and
-/// returns the resulting ADX_* / ANDROID_* variables.
-fn source_config(root: &Path) -> Result<HashMap<String, String>, String> {
+/// Sources defaults.env then local.env in bash with the given environment (adx's own
+/// semantics) and returns the resulting ADX_* / ANDROID_* variables. `BASH_ENV`/`ENV`
+/// are removed so the environment can't inject code into this shell.
+fn source_config(
+    root: &Path,
+    process: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
     let script = r#"set -a; . "$1/config/defaults.env"; if [ -f "$1/config/local.env" ]; then . "$1/config/local.env"; fi; env -0"#;
     let mut cmd = Command::new("bash");
-    cmd.args(["-c", script, "aodm-config"])
+    cmd.args(["--noprofile", "--norc", "-c", script, "aodm-config"])
         .arg(root)
         .env_clear()
-        .env("PATH", "/usr/local/bin:/usr/bin:/bin");
-    for k in PASS_THROUGH {
-        if let Ok(v) = std::env::var(k) {
-            cmd.env(k, v);
-        }
-    }
+        .envs(
+            process
+                .iter()
+                .filter(|(k, _)| !matches!(k.as_str(), "BASH_ENV" | "ENV")),
+        );
     let out = cmd
         .output()
         .map_err(|e| format!("cannot run bash to read {}: {e}", root.display()))?;
@@ -208,14 +201,40 @@ fn source_config(root: &Path) -> Result<HashMap<String, String>, String> {
             String::from_utf8_lossy(&out.stderr).trim()
         ));
     }
-    Ok(out
+    let after: HashMap<String, String> = out
         .stdout
         .split(|b| *b == 0)
         .filter_map(|kv| std::str::from_utf8(kv).ok())
         .filter_map(|kv| kv.split_once('='))
-        .filter(|(k, _)| k.starts_with("ADX_") || k.starts_with("ANDROID_"))
         .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    // Only what the config files set (or changed) counts as "config".
+    Ok(after
+        .into_iter()
+        .filter(|(k, v)| {
+            (k.starts_with("ADX_") || k.starts_with("ANDROID_"))
+                && config_sets(root, k, process.get(k), v)
+        })
         .collect())
+}
+
+/// True when `key` is assigned in the config files (so its value is the config's,
+/// even if it equals the environment's).
+fn config_sets(root: &Path, key: &str, before: Option<&String>, after: &str) -> bool {
+    if before.map(String::as_str) != Some(after) {
+        return true;
+    }
+    ["config/defaults.env", "config/local.env"].iter().any(|f| {
+        std::fs::read_to_string(root.join(f))
+            .map(|t| {
+                t.lines().any(|l| {
+                    l.trim_start()
+                        .trim_start_matches("export ")
+                        .starts_with(&format!("{key}="))
+                })
+            })
+            .unwrap_or(false)
+    })
 }
 
 #[cfg(test)]
@@ -237,17 +256,25 @@ mod tests {
     }
 
     #[test]
-    fn process_beats_config_beats_fallback() {
-        let process = map(&[("ADX_EMU_GPU", "auto"), ("ADX_ROOT", "/r")]);
+    fn config_beats_process_beats_fallback() {
+        let process = map(&[
+            ("ADX_EMU_GPU", "host"),
+            ("ADX_ROOT", "/r"),
+            ("ANDROID_AVD_HOME", "/avd"),
+        ]);
         let config = map(&[("ADX_EMU_GPU", "software"), ("ADX_AOD_MAX_SAVES", "7")]);
         let env = Env::resolve(&process, &config, Some("/r"), "/home/u");
-        assert_eq!(env.get("ADX_EMU_GPU"), "auto");
-        assert_eq!(env.vars["ADX_EMU_GPU"].source, Source::Process);
+        assert_eq!(
+            env.get("ADX_EMU_GPU"),
+            "software",
+            "a stale shell value must not win"
+        );
+        assert_eq!(env.vars["ADX_EMU_GPU"].source, Source::Config);
+        assert_eq!(env.get("ANDROID_AVD_HOME"), "/avd");
+        assert_eq!(env.vars["ANDROID_AVD_HOME"].source, Source::Process);
         assert_eq!(env.num("ADX_AOD_MAX_SAVES", 3), 7);
-        assert_eq!(env.vars["ADX_AOD_MAX_SAVES"].source, Source::Config);
         assert_eq!(env.get("ADX_AOD_HOME"), "/home/u/.local/share/aod");
         assert_eq!(env.vars["ADX_AOD_HOME"].source, Source::Fallback);
-        assert_eq!(env.get("ADX_ROOT"), "/r");
         assert_eq!(env.vars["ADX_ROOT"].source, Source::Process);
     }
 
@@ -275,10 +302,29 @@ mod tests {
     }
 
     #[test]
-    fn sources_real_framework_config() {
-        let cfg = source_config(&repo_root()).unwrap();
-        assert!(cfg.contains_key("ADX_LOG_DIR"));
-        assert!(cfg.contains_key("ADX_AOD_HOME"));
+    fn sources_real_config_with_adx_semantics() {
+        let root = repo_root();
+        let mut process = map(&[
+            ("HOME", "/home/t"),
+            ("PATH", "/usr/bin:/bin"),
+            ("ADX_APP_SKILLS", "false"),
+            ("ADX_EMU_GPU", "stale"),
+            ("BASH_ENV", "/nonexistent-should-be-ignored"),
+        ]);
+        process.insert("XDG_STATE_HOME".into(), "/xdg/state".into());
+        let cfg = source_config(&root, &process).unwrap();
+        assert_eq!(
+            cfg["ADX_LOG_DIR"], "/xdg/state/adx",
+            "XDG honoured like under adx"
+        );
+        assert_eq!(
+            cfg["ADX_APP_SKILLS"], "false",
+            "VAR:-default assignments honour the environment"
+        );
+        assert_ne!(
+            cfg["ADX_EMU_GPU"], "stale",
+            "plain assignments override the environment"
+        );
     }
 
     #[test]
@@ -286,18 +332,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("config")).unwrap();
         std::fs::write(dir.path().join("config/defaults.env"), "exit 3\n").unwrap();
-        let err = source_config(dir.path()).unwrap_err();
+        let err = source_config(dir.path(), &map(&[("PATH", "/usr/bin:/bin")])).unwrap_err();
         assert!(err.contains("exit 3"), "{err}");
     }
 
-    /// The built-in fallbacks must equal what defaults.env produces (without local.env
-    /// and XDG overrides), so a standalone binary behaves like the framework.
+    /// The built-in fallbacks must equal what defaults.env produces (no local.env, no
+    /// XDG overrides), so a standalone binary behaves like the framework.
     #[test]
     fn fallbacks_match_defaults_env() {
         let root = repo_root();
         let home = "/home/fallback-test";
         let out = Command::new("bash")
-            .args(["-c", r#"set -a; . "$1/config/defaults.env"; env -0"#, "t"])
+            .args([
+                "--noprofile",
+                "--norc",
+                "-c",
+                r#"set -a; . "$1/config/defaults.env"; env -0"#,
+                "t",
+            ])
             .arg(&root)
             .env_clear()
             .env("HOME", home)

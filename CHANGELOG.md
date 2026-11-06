@@ -36,6 +36,15 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Technical document `docs/phone-image-manager.md` with flat dark diagrams.
 
 ### Added
+- aodm P2 (inventory and version card): `aodm list [--group G]` (state,
+  port, API, ABI, tag, system image revision, device, RAM, size, groups),
+  `aodm card` (two even columns: aodm/adx versions, host, toolchain,
+  emulation; then the image table); `aod-core` modules `avd` (scan, broken
+  images, name rules), `proc` (emulators from `/proc`, never matching shells),
+  `registry` (`images.toml`, unknown keys kept, atomic save), `card`.
+- `devices` module (default profile): builds `aodm` with the pinned toolchain
+  and installs it to `~/.local/bin/aodm`; status reports stale builds;
+  `adx devices run <aodm args>`; `remove` deletes only the binary.
 - `adx check [--staged|--full]` (`lib/check.sh`): one quality gate for local,
   pre-commit and CI: shell (`bash -n`, ShellCheck), Rust (fmt, clippy, test,
   cargo deny), docs (relative links, documented commands exist, stale terms),
@@ -107,6 +116,8 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   its own serial and fails with a clear message.
 
 ### Changed
+- aodm reads configuration with adx's precedence: config files (honouring
+  `${VAR:-default}` from the environment) win over a stale shell environment.
 - CI triggers once per change (push to `main` and tags, pull requests) and
   cancels superseded runs.
 - `origin` pushes to MensuraMedia only; LinearGenetics is a separate remote

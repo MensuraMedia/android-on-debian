@@ -93,6 +93,9 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 | `gradle` | Gradle 9.8.2, used only to generate app wrappers | `~/.local/opt/gradle` |
 | `node` | Node.js 26 LTS for mobile-mcp (SHA-256 verified), if missing or too old | `~/.local/opt/node`, `~/.local/bin` |
 | `mobile-mcp` | `@mobilenext/mobile-mcp` registered in Claude Code | `~/.claude.json` (user scope) |
+| `rust` | Rust toolchain (pinned, via rustup) | `~/.cargo`, `~/.rustup` |
+| `devtools` | ShellCheck, cargo-deny (pinned), optional pre-commit hook | `~/.local/opt`, `~/.local/bin` |
+| `devices` | Builds and installs `aodm`, the phone image manager (`adx devices run <args>`) | `~/.local/bin/aodm` |
 | `claude-permissions` | Permission allowlist template | `<project>/.claude/settings.json` |
 | `claude-rules` | Global rules (changelog, handoff, logging) and the `adversarial-reviewer` agent | `~/.claude/CLAUDE.md` block, `~/.claude/agents/` |
 | `skills` | Pinned design and code skills (below) | `<app>/.claude/skills/` |

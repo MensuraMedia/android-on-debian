@@ -24,8 +24,8 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 
 | Crate | Status | Role |
 | --- | --- | --- |
-| `aod-core` | P1: `env`, `log`, `ini`, `error` | Library, no terminal I/O; shared by every front end |
-| `aodm` | P1: `--version`, `env` | CLI (clap); TUI from P8 |
+| `aod-core` | P1: `env`, `log`, `ini`, `error`; P2: `avd`, `proc`, `registry`, `card` | Library, no terminal I/O; shared by every front end |
+| `aodm` | P2: `list [--group G]`, `card`, `env`, `--version` | CLI (clap); TUI from P8 |
 | `aod-phone` | P7 | Standalone phone runtime + mechanics panel |
 | `aod-gui` | future | eframe front end |
 
@@ -45,7 +45,20 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 - **`error`**: typed errors (`Io`, `Parse`, `Config`; more per phase) so front
   ends can react.
 
-## 3. Data on disk *(P2–P4)*
+## 3. Data on disk *(P2, done for inventory)*
+
+| Path | What | Read by |
+| --- | --- | --- |
+| `$ANDROID_AVD_HOME/<name>.ini` | `path=` (absolute), `path.rel=` (relative to `~/.android`), `target=android-<api>` | `avd::scan` (falls back to `path.rel` when `path` is stale after a move) |
+| `<name>.avd/config.ini` | hardware/device/image keys (`hw.*`, `abi.type`, `tag.id`, `image.sysdir.1`); `avd.id`/`avd.name` are literal `<build>` placeholders | `avd::Image` accessors, lossless `ini` editor |
+| `<name>.avd/` | qcow2 disks (relative backing files), `snapshots/` (absolute paths), lock files while running | size via allocated blocks (`du`), copies in P4 |
+| `$ANDROID_HOME/<image.sysdir.1>/source.properties` | system image `Pkg.Revision` | version card / list `REV` |
+| `/proc/<pid>/cmdline` | running emulators: qemu process name + `-avd`/`-port` | `proc::emulators` (never matches shells) |
+| `$ADX_AOD_HOME/images.toml` | registry: groups, pinned port, template, origin; unknown keys preserved; atomic save | `registry::Registry` |
+
+Images whose folder or `config.ini` is missing are still listed (state `broken`)
+so they can be repaired or removed. Names aodm accepts: letters, digits, `.`,
+`_`, `-`, 1–64 characters, not starting with `.` or `-`.
 ## 4. Saves *(P4)*
 ## 5. Running many emulators *(P3)*
 ## 6. Settings profiles *(P5)*
@@ -54,7 +67,21 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 ## 9. Security locks *(P5)*
 ## 10. Spin-offs, phone mechanics, switchboard *(P7)*
 ## 11. The ten multi-device features *(P2–P8)*
-## 12. Version card *(P2)*
+## 12. Version card *(P2, done)*
+
+`aodm card` (CLI; TUI pane in P8; GUI grid later) renders one data model
+(`card::VersionCard`): two even columns, each padded to its longest key, then
+the image table (same as `aodm list`).
+
+| Column | Section | Rows (source) |
+| --- | --- | --- |
+| left | aodm | version + git (built in), adx release + git (`CHANGELOG.md` first released heading, `git describe`), config root |
+| left | Host | OS (`/etc/os-release`), kernel, CPU + threads (`/proc/cpuinfo`), RAM total/available (`/proc/meminfo`), KVM (open `/dev/kvm`), free disk on the saves filesystem (`statvfs`) |
+| right | Toolchain | emulator, adb, cmdline-tools (`source.properties`), SDK platforms, build-tools (directories), JDK (`release`), Rust (compiler that built aodm) |
+| right | Emulation | GPU mode, emulator environment (NVIDIA offload / none / custom), running vs `ADX_AOD_MAX_INSTANCES` |
+| table | Images | name, state (running :port / stopped / broken), API, ABI, tag, system image revision, device, RAM, size on disk, groups |
+
+Only `git describe` runs as a process; everything else is read from files.
 ## 13. Safety *(every phase)*
 
 ## 14. Dependencies and best practices *(P1)*
@@ -65,6 +92,8 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 | `anyhow` | aodm | Error context in the binary |
 | `thiserror` | aod-core | Typed errors |
 | `jiff` | aod-core | Local-time log timestamps (sound across threads) |
+| `serde` + `toml` | aod-core | `images.toml` registry (unknown keys preserved) |
+| `rustix` (fs) | aod-core | `statvfs` (free disk); flock/kill in later phases |
 | `tempfile` | dev | Test fixtures |
 
 Bar for a new dependency: it replaces more code than it costs, has a stated

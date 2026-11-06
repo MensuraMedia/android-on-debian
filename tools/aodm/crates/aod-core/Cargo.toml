@@ -10,7 +10,10 @@ publish = false
 
 [dependencies]
 jiff.workspace = true
+rustix.workspace = true
+serde.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

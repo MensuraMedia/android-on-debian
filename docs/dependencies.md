@@ -108,6 +108,9 @@ Platform APIs the example app uses instead of extra libraries:
 | anyhow | 1.0.104 | aodm | error context |
 | thiserror | 2.0.21 | aod-core | typed errors |
 | jiff | 0.2.39 | aod-core | log timestamps |
+| serde | 1.0.229 (derive) | aod-core | registry (de)serialisation |
+| toml | 1.2.0 | aod-core | `images.toml` |
+| rustix | 1.1.6 (fs) | aod-core | statvfs, later flock/kill (safe syscalls, no unsafe) |
 | tempfile | 3 | dev | test fixtures |
 
 Policy (`tools/aodm/deny.toml`, checked by `adx check`): crates.io only, no wildcards, licences MIT / Apache-2.0 / Unicode-3.0, yanked crates denied.

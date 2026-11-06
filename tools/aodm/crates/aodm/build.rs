@@ -16,6 +16,15 @@ fn main() {
     let rev =
         git(&["describe", "--always", "--dirty", "--abbrev=7"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=AODM_GIT={rev}");
+    // Toolchain that built this binary (shown on the version card).
+    let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
+    let rustc_v = Command::new(rustc)
+        .arg("--version")
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+    println!("cargo:rustc-env=AODM_RUSTC={rustc_v}");
     if let Ok(root) = std::env::var("ADX_ROOT") {
         println!("cargo:rustc-env=ADX_ROOT={root}");
     }
