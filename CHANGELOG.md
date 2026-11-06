@@ -16,7 +16,13 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   profile continues and `adx up` ends with the list of incomplete modules.
 - Rust links with the system C toolchain: `system` preflight now requires
   `build-essential` (`cc`).
-- Rolling back to v0.2.0: `./adx devtools hook remove` (the hook is a no-op on
+- `adx up` now also builds `aodm` (`devices` module): `cargo build --release
+  --locked` downloads crates from crates.io on first run (~65 MB cache in
+  `~/.cargo/registry`), writes ~90 MB to `tools/aodm/target/` and takes about a
+  minute. If `~/.local/bin/aodm` already exists and wasn't installed by adx, it
+  is left alone and `devices` reports it (move it away, or `ADX_FORCE=1`).
+- Rolling back to v0.2.0: `./adx devices remove` (deletes only adx's
+  `~/.local/bin/aodm`; v0.2.0 would never notice it), `./adx devtools hook remove` (the hook is a no-op on
   v0.2.0 anyway), `rm -rf tools/aodm/target`, `git checkout v0.2.0`. Left
   behind, remove by hand if wanted: Rust toolchain 1.95.0
   (`~/.cargo/bin/rustup toolchain uninstall 1.95.0`; never delete `~/.cargo`
@@ -25,15 +31,14 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `~/.diagram-design/profiles/aod-flat-dark.md`.
 
 ### Planned for 0.3.0 (approved, not yet built)
-- `aodm` phone image manager (Rust, CLI + TUI): inventory, lifecycle for one,
-  a group or all images, full-copy saves, clone/rename/delete, groups, bulk
-  settings profiles, bulk app deploy, broadcast/capture, health and version card.
+- `aodm`: lifecycle for one, a group or all images (ports, budget, health),
+  full-copy saves, clone/rename/delete, groups, bulk settings profiles, bulk
+  app deploy, broadcast/capture, terminal UI.
 - Build templates with a built-in `barebones` default; identity policies
   (`private`/`standard`/`fixed`); per-image security locks; spin-offs into
   standalone phones (`aod-phone`) with a calls/SMS switchboard.
-- Change pipeline: `adx check` gate, `devtools` module, `deploy-reviewer`
-  agent, `review-change` workflow, `adx release`, `adx upgrade` with rollback.
-- Technical document `docs/phone-image-manager.md` with flat dark diagrams.
+- `adx release`, `adx upgrade` with migrations and rollback, `adx new-module`.
+- Remaining technical document sections and diagrams.
 
 ### Added
 - aodm P2 (inventory and version card): `aodm list [--group G]` (state,
@@ -75,6 +80,27 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- P2 reviews (code: 13, deployment: 10 findings), among them:
+  - One junk `.ini` (directory, dangling link, non-UTF-8) made `aodm list`
+    fail; it is now listed as broken with the reason.
+  - AVD home follows the emulator (`ANDROID_AVD_HOME`, `ANDROID_EMULATOR_HOME`,
+    `ANDROID_USER_HOME`); `path.rel` resolves against the user home and a
+    stale `path=` falls back correctly; corrupt `path=` values outside `*.avd`
+    are never walked.
+  - Other users' emulators no longer count as running; `@name` and `-ports`
+    launches are recognised.
+  - Config loading passes only an allowlisted environment to bash (no exported
+    functions, `PS4`/`SHELLOPTS` injection, forged values); `aodm env` notes
+    ignored environment values; `ADX_AOD_HOME`/`ADX_AOD_SAVES_DIR` accept
+    environment overrides (sandbox).
+  - `devices` never overwrites or removes a `~/.local/bin/aodm` it didn't
+    install (SHA-256 marker); rebuilds when HEAD changes; pinned target dir and
+    toolchain; checks for `cc`; never installs a stale binary.
+  - Errors are logged and printed once; a broken `images.toml` warns instead of
+    hiding all images; `--group` matches whole group names and says when a
+    group is empty; registry error lines are correct; size counts hard links
+    once and stays on one filesystem.
+  - CI also runs the release build and `aodm card`.
 - P1 code review (21 findings), among them:
   - `adx check --staged` checked the working tree instead of the index; it now
     checks a snapshot of exactly what is staged (and stays offline).
@@ -116,8 +142,11 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   its own serial and fails with a clear message.
 
 ### Changed
-- aodm reads configuration with adx's precedence: config files (honouring
-  `${VAR:-default}` from the environment) win over a stale shell environment.
+- aodm reads configuration with adx's precedence: config files win over the
+  process environment (as in adx); only keys written as `${VAR:-default}`
+  honour the environment. `aodm env` warns about ignored environment values.
+  To sandbox aodm, set `ADX_AOD_HOME` (and/or `ADX_AOD_SAVES_DIR`), which are
+  now `${VAR:-default}` keys for adx and aodm alike, or `ANDROID_AVD_HOME`.
 - CI triggers once per change (push to `main` and tags, pull requests) and
   cancels superseded runs.
 - `origin` pushes to MensuraMedia only; LinearGenetics is a separate remote

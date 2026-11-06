@@ -28,3 +28,5 @@ jobs:
           # Diff base: the commit before the push, or the PR base (empty on new branches/tags: adx falls back).
           ADX_CHECK_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: ./adx check
+      - name: Release build and install (as adx up does)
+        run: ./adx devices install && ~/.local/bin/aodm --version && ~/.local/bin/aodm card

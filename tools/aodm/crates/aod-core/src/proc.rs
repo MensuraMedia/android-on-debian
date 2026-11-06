@@ -2,6 +2,7 @@
 //! itself (a shell running `pgrep -f '...-avd NAME'` would match its own command line).
 
 use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,19 +37,28 @@ pub fn parse_cmdline(pid: u32, raw: &[u8]) -> Option<EmuProc> {
             .and_then(|i| args.get(i + 1))
             .copied()
     };
+    // `-avd NAME`, or the launcher's shorthand `@NAME` (kept in the qemu argv).
+    let avd = after("-avd").or_else(|| args.iter().skip(1).find_map(|a| a.strip_prefix('@')))?;
+    // `-port N`, or `-ports CONSOLE,ADB`.
+    let port = after("-port")
+        .or_else(|| after("-ports").and_then(|p| p.split(',').next()))
+        .and_then(|p| p.parse().ok());
     Some(EmuProc {
         pid,
-        avd: after("-avd")?.to_string(),
-        port: after("-port").and_then(|p| p.parse().ok()),
+        avd: avd.to_string(),
+        port,
     })
 }
 
-/// All running emulators on this machine (any user's processes we can read).
+/// Running emulators owned by the current user (another user's emulator with the
+/// same AVD name is not "our image running").
 pub fn emulators() -> Vec<EmuProc> {
-    emulators_in(Path::new("/proc"))
+    let me = fs::metadata("/proc/self").map(|m| m.uid()).ok();
+    emulators_in(Path::new("/proc"), me)
 }
 
-pub fn emulators_in(proc_root: &Path) -> Vec<EmuProc> {
+/// Emulators under `proc_root`, optionally only those owned by `uid`.
+pub fn emulators_in(proc_root: &Path, uid: Option<u32>) -> Vec<EmuProc> {
     let Ok(dir) = fs::read_dir(proc_root) else {
         return Vec::new();
     };
@@ -56,6 +66,11 @@ pub fn emulators_in(proc_root: &Path) -> Vec<EmuProc> {
         .flatten()
         .filter_map(|e| {
             let pid: u32 = e.file_name().to_str()?.parse().ok()?;
+            if let Some(want) = uid
+                && e.metadata().ok()?.uid() != want
+            {
+                return None;
+            }
             parse_cmdline(pid, &fs::read(e.path().join("cmdline")).ok()?)
         })
         .collect();
@@ -122,6 +137,16 @@ mod tests {
     }
 
     #[test]
+    fn launcher_shorthand_and_ports() {
+        let p = parse_cmdline(
+            5,
+            &raw(&["qemu-system-x86_64", "@pixel", "-ports", "5556,5557"]),
+        )
+        .unwrap();
+        assert_eq!((p.avd.as_str(), p.port), ("pixel", Some(5556)));
+    }
+
+    #[test]
     fn scans_a_fake_proc_tree() {
         let root = tempfile::tempdir().unwrap();
         for (pid, args) in [
@@ -136,7 +161,17 @@ mod tests {
             fs::write(root.path().join(pid).join("cmdline"), raw(&args)).unwrap();
         }
         fs::create_dir(root.path().join("self")).unwrap();
-        let found = emulators_in(root.path());
+        let found = emulators_in(root.path(), None);
+        let mine = fs::metadata(root.path().join("100")).unwrap().uid();
+        assert_eq!(
+            emulators_in(root.path(), Some(mine)).len(),
+            2,
+            "own processes kept"
+        );
+        assert!(
+            emulators_in(root.path(), Some(mine + 1)).is_empty(),
+            "other users' processes dropped"
+        );
         assert_eq!(
             found.iter().map(|p| p.avd.as_str()).collect::<Vec<_>>(),
             ["a", "b"]

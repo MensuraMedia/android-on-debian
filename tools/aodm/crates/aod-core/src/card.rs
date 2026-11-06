@@ -1,6 +1,7 @@
 //! Version card: system specs and versions as data, rendered by each front end
 //! (CLI text, TUI tables, later GUI grid). Everything is read from files; the only
-//! process started is `git describe` for the framework revision.
+//! process the card starts is `git describe` for the framework revision (loading
+//! the configuration separately runs bash once, see env.rs).
 
 use std::fs;
 use std::path::Path;
@@ -259,7 +260,7 @@ pub fn build(
                     None => "running".into(),
                 })
                 .unwrap_or_else(|| {
-                    if i.config.is_none() {
+                    if i.problem.is_some() {
                         "broken".into()
                     } else {
                         "stopped".into()

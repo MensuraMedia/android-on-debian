@@ -59,7 +59,7 @@ CHANGELOG/HANDOFF updates and a commit.
 | --- | --- | --- |
 | P0 | Spike on the real emulator (settings, flags, identity fields, copies, locks, calls/SMS) | **Done** |
 | P1 | Pipeline foundation: `adx check` gate (shell, Rust, docs, process, security), `devtools` module (ShellCheck, cargo-deny, pre-commit hook), `deploy-reviewer` agent, `review-change` workflow, CI hardening; `rust` module; Cargo workspace; `env`, `log`, `ini` + tests | **Done**: reviewed (adversarial: 21 findings, deployment: 9 findings), all fixed and regression-tested |
-| P2 | Inventory: AVD scan, `/proc` process detection, registry, version card; `aodm list/card/env`; `devices` module (build + install) | **Done**, pending P2 review |
+| P2 | Inventory: AVD scan, `/proc` process detection, registry, version card; `aodm list/card/env`; `devices` module (build + install) | **Done**: reviewed (code: 13, deployment: 10 findings), all fixed and reproductions replayed |
 | P3 | Lifecycle: port allocation (16 slots), start/stop/restart, RAM/CPU budget, adb + emulator console clients, health | Planned |
 | P4 | Full-copy saves (create, verify, restore, open as new, prune, pin), clone, rename, delete | Planned |
 | P5 | Settings profiles (hardware / launch / runtime, dry-run diff, per-image report), groups, selectors; identity policies (`private`, `standard`, `fixed`, uniqueness check, masked audit); security locks | Planned |

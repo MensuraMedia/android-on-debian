@@ -43,6 +43,8 @@ pub struct Env {
     vars: HashMap<String, Value>,
     /// Why the framework config could not be read, if it couldn't.
     pub config_error: Option<String>,
+    /// Environment values ignored because the config files set the key (adx semantics).
+    pub ignored: Vec<String>,
 }
 
 /// Keys aodm reads, with fallbacks used only when the framework config is unavailable.
@@ -51,7 +53,12 @@ pub struct Env {
 const KEYS: &[(&str, &str)] = &[
     ("ADX_ROOT", ""),
     ("ANDROID_HOME", "~/Android/Sdk"),
-    ("ANDROID_AVD_HOME", "~/.android/avd"),
+    // The emulator's own lookup order for AVDs: ANDROID_AVD_HOME, then
+    // $ANDROID_EMULATOR_HOME/avd, then $ANDROID_USER_HOME/avd, then ~/.android/avd.
+    // shortcut: the deprecated ANDROID_SDK_HOME/.android is not consulted.
+    ("ANDROID_EMULATOR_HOME", ""),
+    ("ANDROID_USER_HOME", "~/.android"),
+    ("ANDROID_AVD_HOME", ""),
     ("ADX_JAVA_HOME", "~/.local/opt/jdk-21"),
     ("ADX_LOG_DIR", "~/.local/state/adx"),
     ("ADX_LOG_MAX_KB", "5120"),
@@ -101,6 +108,20 @@ impl Env {
         let home = process.get("HOME").cloned().unwrap_or_default();
         let mut env = Env::resolve(&process, &config, root.as_deref(), &home);
         env.config_error = config_error;
+        env.ignored = env
+            .vars
+            .iter()
+            .filter(|(k, v)| {
+                v.source == Source::Config && process.get(*k).is_some_and(|p| p != &v.value)
+            })
+            .map(|(k, v)| {
+                format!(
+                    "{k}={} in the environment is ignored (config sets {})",
+                    process[k], v.value
+                )
+            })
+            .collect();
+        env.ignored.sort();
         env
     }
 
@@ -146,9 +167,23 @@ impl Env {
             };
             vars.insert((*key).to_string(), v);
         }
+        // AVD home: explicit value, else <emulator or user home>/avd (as the emulator does).
+        if vars["ANDROID_AVD_HOME"].value.is_empty() {
+            let base = if vars["ANDROID_EMULATOR_HOME"].value.is_empty() {
+                "ANDROID_USER_HOME"
+            } else {
+                "ANDROID_EMULATOR_HOME"
+            };
+            let v = Value {
+                value: format!("{}/avd", vars[base].value),
+                source: vars[base].source,
+            };
+            vars.insert("ANDROID_AVD_HOME".into(), v);
+        }
         Env {
             vars,
             config_error: None,
+            ignored: Vec::new(),
         }
     }
 
@@ -165,6 +200,14 @@ impl Env {
         self.get(key).parse().unwrap_or(default)
     }
 
+    /// The Android user directory `path.rel=` in AVD `.ini` files is relative to.
+    pub fn android_user_home(&self) -> PathBuf {
+        match self.get("ANDROID_EMULATOR_HOME") {
+            "" => self.path("ANDROID_USER_HOME"),
+            e => PathBuf::from(e),
+        }
+    }
+
     /// All known keys with value and source, sorted (for `aodm env`).
     pub fn entries(&self) -> Vec<(&str, &Value)> {
         let mut v: Vec<_> = self.vars.iter().map(|(k, v)| (k.as_str(), v)).collect();
@@ -173,23 +216,22 @@ impl Env {
     }
 }
 
-/// Sources defaults.env then local.env in bash with the given environment (adx's own
-/// semantics) and returns the resulting ADX_* / ANDROID_* variables. `BASH_ENV`/`ENV`
-/// are removed so the environment can't inject code into this shell.
+/// Sources defaults.env then local.env in bash (adx's own semantics) and returns the
+/// resulting ADX_* / ANDROID_* variables. Only an allowlist of variables reaches bash
+/// (HOME, PATH, USER, LANG, LC_*, XDG_*, ADX_*, ANDROID_*): no exported functions
+/// (BASH_FUNC_*), BASH_ENV/ENV, SHELLOPTS/PS4 or IFS, so the environment can't run code
+/// in this shell or forge values. (It could still affect tools the config files call
+/// through PATH, exactly as under adx.)
 fn source_config(
     root: &Path,
     process: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
-    let script = r#"set -a; . "$1/config/defaults.env"; if [ -f "$1/config/local.env" ]; then . "$1/config/local.env"; fi; env -0"#;
+    let script = r#"set -a; . "$1/config/defaults.env"; if [ -f "$1/config/local.env" ]; then . "$1/config/local.env"; fi; /usr/bin/env -0"#;
     let mut cmd = Command::new("bash");
     cmd.args(["--noprofile", "--norc", "-c", script, "aodm-config"])
         .arg(root)
         .env_clear()
-        .envs(
-            process
-                .iter()
-                .filter(|(k, _)| !matches!(k.as_str(), "BASH_ENV" | "ENV")),
-        );
+        .envs(process.iter().filter(|(k, _)| allowed(k)));
     let out = cmd
         .output()
         .map_err(|e| format!("cannot run bash to read {}: {e}", root.display()))?;
@@ -216,6 +258,13 @@ fn source_config(
                 && config_sets(root, k, process.get(k), v)
         })
         .collect())
+}
+
+fn allowed(k: &str) -> bool {
+    matches!(k, "HOME" | "PATH" | "USER" | "LANG")
+        || ["LC_", "XDG_", "ADX_", "ANDROID_"]
+            .iter()
+            .any(|p| k.starts_with(p))
 }
 
 /// True when `key` is assigned in the config files (so its value is the config's,
@@ -325,6 +374,51 @@ mod tests {
             cfg["ADX_EMU_GPU"], "stale",
             "plain assignments override the environment"
         );
+    }
+
+    #[test]
+    fn environment_cannot_inject_or_forge() {
+        let dir = tempfile::tempdir().unwrap();
+        let marker = dir.path().join("pwned");
+        let set_fn = format!("() {{ touch {}; builtin set \"$@\"; }}", marker.display());
+        let ps4 = format!("$(touch {})", marker.display());
+        let process = map(&[
+            ("HOME", "/home/t"),
+            ("PATH", "/usr/bin:/bin"),
+            ("BASH_FUNC_set%%", &set_fn),
+            ("BASH_FUNC_env%%", "() { echo ADX_EMU_GPU=evil; }"),
+            ("SHELLOPTS", "xtrace"),
+            ("PS4", &ps4),
+        ]);
+        let cfg = source_config(&repo_root(), &process).unwrap();
+        assert!(!marker.exists(), "code from the environment ran");
+        assert_ne!(cfg.get("ADX_EMU_GPU").map(String::as_str), Some("evil"));
+    }
+
+    #[test]
+    fn avd_home_follows_emulator_lookup_order() {
+        let none = HashMap::new();
+        let env = Env::resolve(&none, &none, None, "/h");
+        assert_eq!(env.get("ANDROID_AVD_HOME"), "/h/.android/avd");
+        let env = Env::resolve(&map(&[("ANDROID_USER_HOME", "/u")]), &none, None, "/h");
+        assert_eq!(env.get("ANDROID_AVD_HOME"), "/u/avd");
+        let env = Env::resolve(
+            &map(&[("ANDROID_USER_HOME", "/u"), ("ANDROID_EMULATOR_HOME", "/e")]),
+            &none,
+            None,
+            "/h",
+        );
+        assert_eq!(
+            (env.get("ANDROID_AVD_HOME"), env.android_user_home()),
+            ("/e/avd", PathBuf::from("/e"))
+        );
+        let env = Env::resolve(
+            &map(&[("ANDROID_AVD_HOME", "/x"), ("ANDROID_EMULATOR_HOME", "/e")]),
+            &none,
+            None,
+            "/h",
+        );
+        assert_eq!(env.get("ANDROID_AVD_HOME"), "/x");
     }
 
     #[test]

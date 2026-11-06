@@ -1,6 +1,7 @@
 //! `$ADX_AOD_HOME/images.toml`: what aodm knows about images beyond the AVD files
 //! (groups, pinned port, template, origin). Keys it doesn't know are kept on save,
-//! so newer and older aodm versions can share one file.
+//! so newer and older aodm versions can share one file. Comments are not kept.
+//! shortcut: no lock and no `schema` key yet; the first writer (P3/P4) adds both.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -49,7 +50,7 @@ impl Registry {
                 path: path.clone(),
                 line: e
                     .span()
-                    .map(|s| text[..s.start].lines().count().max(1))
+                    .map(|s| text[..s.start].matches('\n').count() + 1)
                     .unwrap_or(0),
                 msg: e.message().to_string(),
             }),
@@ -70,7 +71,8 @@ impl Registry {
             let mut f = fs::File::create(&tmp)?;
             f.write_all(format!("# aodm image registry (managed by aodm; safe to edit while aodm is not running)\n{text}").as_bytes())?;
             f.sync_all()?;
-            fs::rename(&tmp, &path)
+            fs::rename(&tmp, &path)?;
+            fs::File::open(aod_home)?.sync_all()
         };
         write().map_err(|e| {
             let _ = fs::remove_file(&tmp);
@@ -128,5 +130,8 @@ mod tests {
         fs::write(Registry::path(dir.path()), "[images.a]\nport = \"x\"\n").unwrap();
         let err = Registry::load(dir.path()).unwrap_err().to_string();
         assert!(err.contains("images.toml:2"), "{err}");
+        fs::write(Registry::path(dir.path()), "a=1\nb=2\n=3\n").unwrap();
+        let err = Registry::load(dir.path()).unwrap_err().to_string();
+        assert!(err.contains("images.toml:3"), "error at column 0: {err}");
     }
 }

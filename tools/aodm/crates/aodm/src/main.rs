@@ -33,7 +33,7 @@ enum Cmd {
     Env,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     let cli = Cli::parse();
     let env = Env::load();
     let log = Logger::new(&env);
@@ -41,27 +41,47 @@ fn main() -> anyhow::Result<()> {
         eprintln!("aodm: warning: {e}");
         log.warn(e);
     }
-    match cli.cmd {
+    // Every failure is reported once on stderr and recorded in the framework log.
+    if let Err(e) = run(cli.cmd, &env, &log) {
+        eprintln!("aodm: error: {e:#}");
+        log.error(&format!("{e:#}"));
+        std::process::exit(1);
+    }
+}
+
+fn run(cmd: Cmd, env: &Env, log: &Logger) -> anyhow::Result<()> {
+    match cmd {
         Cmd::List { group } => {
-            let (images, procs, reg) = inventory(&env)?;
-            let mut c = card::build(&env, &build(), &images, &procs, &reg);
+            let (mut images, procs, reg) = inventory(env, log)?;
             if let Some(g) = &group {
-                c.images.retain(|r| r.groups.split(',').any(|x| x == g));
+                images.retain(|i| reg.groups(&i.name).iter().any(|x| x == g));
             }
+            let c = card::build(env, &build(), &images, &procs, &reg);
             log.info(&format!(
                 "list: {} image(s){}",
                 c.images.len(),
-                group.map(|g| format!(" in group {g}")).unwrap_or_default()
+                group
+                    .as_ref()
+                    .map(|g| format!(" in group {g}"))
+                    .unwrap_or_default()
             ));
+            if c.images.is_empty()
+                && let Some(g) = &group
+            {
+                println!("no images in group {g}");
+                return Ok(());
+            }
             print!("{}", card::render_images(&c.images));
+            problems(&images);
         }
         Cmd::Card => {
-            let (images, procs, reg) = inventory(&env)?;
+            let (images, procs, reg) = inventory(env, log)?;
             log.info("card");
             print!(
                 "{}",
-                card::render_text(&card::build(&env, &build(), &images, &procs, &reg))
+                card::render_text(&card::build(env, &build(), &images, &procs, &reg))
             );
+            problems(&images);
         }
         Cmd::Env => {
             log.info("env");
@@ -70,9 +90,21 @@ fn main() -> anyhow::Result<()> {
             for (key, v) in entries {
                 println!("{key:<width$}  {:<8}  {}", v.source.as_str(), v.value);
             }
+            for w in &env.ignored {
+                eprintln!("aodm: note: {w}");
+            }
         }
     }
     Ok(())
+}
+
+/// Broken images are listed (so they can be fixed or removed); say why under the table.
+fn problems(images: &[avd::Image]) {
+    for i in images {
+        if let Some(p) = &i.problem {
+            eprintln!("aodm: {} is broken: {p}", i.name);
+        }
+    }
 }
 
 fn build() -> Build<'static> {
@@ -82,8 +114,17 @@ fn build() -> Build<'static> {
     }
 }
 
-fn inventory(env: &Env) -> anyhow::Result<(Vec<avd::Image>, Vec<proc::EmuProc>, Registry)> {
-    let images = avd::scan(&env.path("ANDROID_AVD_HOME")).context("scanning phone images")?;
-    let reg = Registry::load(&env.path("ADX_AOD_HOME")).context("reading the image registry")?;
+fn inventory(
+    env: &Env,
+    log: &Logger,
+) -> anyhow::Result<(Vec<avd::Image>, Vec<proc::EmuProc>, Registry)> {
+    let images = avd::scan(&env.path("ANDROID_AVD_HOME"), &env.android_user_home())
+        .context("scanning phone images")?;
+    // A broken registry must not hide the images: warn and continue without it.
+    let reg = Registry::load(&env.path("ADX_AOD_HOME")).unwrap_or_else(|e| {
+        eprintln!("aodm: warning: registry ignored: {e}");
+        log.warn(&format!("registry ignored: {e}"));
+        Registry::default()
+    });
     Ok((images, proc::emulators(), reg))
 }
