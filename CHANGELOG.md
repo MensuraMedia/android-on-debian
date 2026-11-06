@@ -6,6 +6,10 @@ the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `docs/examples/meridian-weather/`: first example app (Compose weather app built
+  with the framework) with six Roborazzi mockups.
+
 ### Fixed
 - CI: add `.shellcheckrc` (bash dialect; SC2034 disabled for module contract
   variables read by the dispatcher).
