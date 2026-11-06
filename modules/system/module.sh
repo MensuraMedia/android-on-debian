@@ -1,7 +1,7 @@
 MOD_DESC="Preflight: system packages, CPU virtualisation, KVM, RAM, disk (prints the sudo commands it needs)"
 
 # command -> Debian/Ubuntu package. Required for adx itself.
-_REQUIRED="bash:bash curl:curl wget:wget unzip:unzip git:git jq:jq perl:perl tar:tar xz:xz-utils sha256sum:coreutils awk:gawk pgrep:procps"
+_REQUIRED="bash:bash curl:curl wget:wget unzip:unzip git:git jq:jq perl:perl tar:tar xz:xz-utils sha256sum:coreutils awk:gawk pgrep:procps cc:build-essential"
 # Used by status checks, the desktop menu entry and backups; adx degrades without them.
 _OPTIONAL="lspci:pciutils notify-send:libnotify-bin desktop-file-validate:desktop-file-utils update-desktop-database:desktop-file-utils getfacl:acl rsync:rsync"
 

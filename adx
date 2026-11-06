@@ -119,11 +119,17 @@ adx_cmd_up() {
   adx_log "profile: $profile"
   local failed=""
   for m in $(sed 's/#.*//' "$file"); do
+    if [ ! -f "$ADX_ROOT/modules/$m/module.sh" ]; then
+      adx_warn "$m: no such module (typo in profiles/$profile.profile?)"; failed="$failed $m"; continue
+    fi
     if adx_run_module "$m" status >/dev/null 2>&1; then
       adx_log "$m: already ok"
     else
       adx_log "$m: installing"
-      adx_run_module "$m" install
+      if ! adx_run_module "$m" install; then
+        adx_warn "$m: install failed (network? see above); continuing with the next module"
+        failed="$failed $m"; continue
+      fi
       if ! adx_run_module "$m" status >/dev/null 2>&1; then
         adx_warn "$m: installed but status still fails (see: adx $m status)"; failed="$failed $m"
       fi

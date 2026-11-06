@@ -8,6 +8,22 @@ the project uses [Semantic Versioning](https://semver.org/).
 
 Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 
+### Upgrading from 0.2.0
+- `./adx up` now installs `rust` (rustup toolchain 1.95.0, a few hundred MB;
+  an existing rustup is reused) and `devtools` (ShellCheck, cargo-deny), fetches
+  the `diagram-design` skill and installs the `deploy-reviewer` agent: it needs
+  the network. A failed download no longer stops the run: the rest of the
+  profile continues and `adx up` ends with the list of incomplete modules.
+- Rust links with the system C toolchain: `system` preflight now requires
+  `build-essential` (`cc`).
+- Rolling back to v0.2.0: `./adx devtools hook remove` (the hook is a no-op on
+  v0.2.0 anyway), `rm -rf tools/aodm/target`, `git checkout v0.2.0`. Left
+  behind, remove by hand if wanted: Rust toolchain 1.95.0
+  (`~/.cargo/bin/rustup toolchain uninstall 1.95.0`; never delete `~/.cargo`
+  or `~/.rustup` if they predate adx), `~/.local/opt/{shellcheck,cargo-deny}-*`
+  and their `~/.local/bin` links, `~/.claude/agents/deploy-reviewer.md`,
+  `~/.diagram-design/profiles/aod-flat-dark.md`.
+
 ### Planned for 0.3.0 (approved, not yet built)
 - `aodm` phone image manager (Rust, CLI + TUI): inventory, lifecycle for one,
   a group or all images, full-copy saves, clone/rename/delete, groups, bulk
@@ -50,6 +66,14 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- `adx up` aborted at the first failed install (skipping every later module)
+  and exited silently on an unknown module in a profile; it now warns,
+  continues, and fails at the end listing incomplete modules.
+- `adx check --full` ignored its own `ADX_APP_SKILLS=false` (defaults.env
+  overwrote it); `ADX_APP_SKILLS` and `ADX_APP_GIT_INIT` now honour the
+  environment.
+- Skill profiles: a locally edited copy is kept as `.bak` before replacement.
+- Pre-commit hook is a no-op on a checkout without `adx check` (rollback-safe).
 - New apps from the template failed `verifyRoborazziDebug` (baselines moved
   into git in 0.2.0, but a new app has none yet). The scaffolder now says to
   record and commit baselines first; `adx check --full` records then verifies.
@@ -59,6 +83,10 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   its own serial and fails with a clear message.
 
 ### Changed
+- CI triggers once per change (push to `main` and tags, pull requests) and
+  cancels superseded runs.
+- `origin` pushes to MensuraMedia only; LinearGenetics is a separate remote
+  (`linear`) until it grants write access.
 - CI runs `adx check` (same gate as local) with a read-only token,
   `actions/checkout` pinned by commit SHA and tools from the framework's own
   pinned modules.

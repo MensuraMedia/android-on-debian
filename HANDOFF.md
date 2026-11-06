@@ -9,7 +9,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 | Area | Status |
 | --- | --- |
-| Framework | 13 modules (`./adx list`); `./adx up` idempotent and `./adx doctor` exit 0 on the hybrid-GPU laptop (Mint 22.2). `studio` is optional and not in any profile |
+| Framework | 15 modules (`./adx list`); `./adx up` idempotent and `./adx doctor` exit 0 on the hybrid-GPU laptop (Mint 22.2). `studio` is optional and not in any profile |
 | Render loop (Roborazzi) | Verified; app baselines now committed in `app/src/test/screenshots/` |
 | Live loop (emulator + adb) | Verified: `adx emulator start --window`, install, launch, location via `adb emu geo fix` |
 | mobile-mcp | Verified from a live Claude Code session (list devices/elements, tap, screenshot) |
@@ -46,6 +46,13 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
    a `ci` profile + GitHub Actions template (`verifyRoborazziDebug`).
 9. Template: R8/minify for release, adaptive app icon, reject Kotlin keywords in
    package names, fail on unrendered `@@TOKENS@@`.
+
+## Approvals recorded
+
+- 2026-11-06: owner requested the `adversarial-reviewer` and `deploy-reviewer`
+  agents ("create adversarial agent…", "ensure agents scrutinize change
+  deployments"); both are global (`~/.claude/agents/`), read-only by
+  instruction (their Bash tool is not technically restricted).
 
 ## Open questions
 

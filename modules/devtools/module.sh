@@ -47,7 +47,7 @@ mod_hook() {
   local h="$ADX_ROOT/.git/hooks/pre-commit"
   if [ "${1:-}" = remove ]; then rm -f "$h"; adx_log "removed $h"; return 0; fi
   [ ! -e "$h" ] || grep -q 'adx check' "$h" || adx_die "$h exists and isn't ours; not overwriting"
-  printf '#!/usr/bin/env bash\n# Installed by adx devtools hook. Skip once with: git commit --no-verify\nexec "%s/adx" check --staged\n' "$ADX_ROOT" > "$h"
+  printf '#!/usr/bin/env bash\n# Installed by adx devtools hook. Skip once with: git commit --no-verify\n# No-op if this checkout of adx has no check command (e.g. after rolling back).\n[ -f "%s/lib/check.sh" ] || exit 0\nexec "%s/adx" check --staged\n' "$ADX_ROOT" "$ADX_ROOT" > "$h"
   chmod +x "$h"
   adx_log "installed $h"
 }

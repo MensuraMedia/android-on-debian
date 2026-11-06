@@ -164,7 +164,7 @@ adx_cmd_check() {
     esac
   done
   _chk_base="$(git -C "$ADX_ROOT" merge-base HEAD origin/main 2>/dev/null || git -C "$ADX_ROOT" rev-parse HEAD~1)"
-  echo "adx check ($_chk_mode${full:+, full=$full}; base ${_chk_base:0:7})"
+  echo "adx check ($_chk_mode$([ "$full" = true ] && echo ", full"); base ${_chk_base:0:7})"
   _chk_shell
   _chk_rust
   _chk_docs

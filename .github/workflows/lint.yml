@@ -2,7 +2,14 @@
 # Hardened: read-only token, actions pinned by commit SHA, tools installed by the
 # framework's own pinned + checksum-verified modules.
 name: check
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

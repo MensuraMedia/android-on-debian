@@ -25,7 +25,7 @@ only when runtime behaviour matters. Both read the same SDK and JDK.
 | Configuration over code | All versions and paths are in `config/defaults.env`; machine overrides go in `config/local.env` |
 | One capability per module | `modules/<name>/module.sh`, run in a subshell so modules can't leak state |
 | Idempotent | `mod_status` gates `mod_install`, so `adx up` can be re-run safely |
-| Verified downloads | Temurin, cmdline-tools, Gradle (and app wrappers) and Node are SHA-256 checked; skills are pinned by commit; a bad cached download is deleted |
+| Verified downloads | Temurin, cmdline-tools, Gradle (and app wrappers), Node, rustup-init, ShellCheck and cargo-deny are SHA-256 checked; skills are pinned by commit; a bad cached download is deleted |
 | No root | Everything goes under `$HOME`; nothing runs sudo, the `system` module prints the commands that need it (apt packages, `kvm` group) |
 | Reversible | `shell-env` writes a marked block that `adx shell-env remove` deletes; modules may provide `mod_remove` |
 | Composable | Profiles are ordered module lists, so a use case is a new profile file |

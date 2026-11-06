@@ -50,7 +50,12 @@ mod_install() {
     _fetch "$repo" "$sha" >/dev/null
   done < <(_rows)
   mkdir -p "$(_profiles_dst)"
-  cp "$(_profiles_src)"/*.md "$(_profiles_dst)/"
+  local f d
+  for f in "$(_profiles_src)"/*.md; do
+    d="$(_profiles_dst)/$(basename "$f")"
+    if [ -f "$d" ] && ! cmp -s "$f" "$d"; then cp "$d" "$d.bak"; adx_warn "kept your edited $(basename "$d") as $d.bak"; fi
+    cp "$f" "$d"
+  done
   adx_log "installed skill profiles into $(_profiles_dst)"
 }
 
