@@ -39,6 +39,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - Lifecycle orchestration (start/stop) has no automated fake-emulator test
   yet (real-emulator checks only); saves/clone/rename/delete have one.
 - Clones and opened saves keep the source's Android ID until P5.
+- `adx emulator stop && adx emulator start` back to back: stop printed
+  "emulator stopped" while the emulator was still exiting, so start said
+  "already running" and nothing came up (seen 2026-11-06). Wait for the
+  process to go (or use `aodm restart`, which waits) until stop waits itself.
 - A headless emulator's screen sleeps, and Doze then cuts app network and
   location (HelloAdx showed "Unable to resolve host" while `adb shell ping`
   worked). Workaround: `adb shell svc power stayon true` (set on adx_api37 on
