@@ -19,6 +19,12 @@ the project uses [Semantic Versioning](https://semver.org/).
 - `docs/research/aodm-spike.md`: what the emulator really allows (settings,
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
+### Fixed
+- `adx emulator stop` killed every running emulator; it now stops only
+  `emulator-$ADX_EMU_PORT` (other images keep running).
+- `adx emulator screenshot` failed with more than one device; it now targets
+  its own serial and fails with a clear message.
+
 ### Changed
 - Vendored skills in the framework repo are git-ignored (`adx skills apply .`
   recreates them from the pinned manifest).

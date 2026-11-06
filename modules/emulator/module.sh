@@ -146,7 +146,8 @@ mod_start() {
 mod_stop() {
   [ "${1:-}" = --notify ] && _ADX_NOTIFY=true
   local s pid i
-  for s in $(_adb devices | awk '/^emulator-/{print $1}'); do _adb -s "$s" emu kill >/dev/null 2>&1 || true; done
+  # Only this AVD's emulator: other emulators (aodm images, spin-offs) keep running.
+  _adb -s "emulator-$ADX_EMU_PORT" emu kill >/dev/null 2>&1 || true
   pid="$(_pid)"
   if [ -n "$pid" ]; then
     for i in $(seq 1 15); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
@@ -200,5 +201,6 @@ mod_accel() { _emu -accel-check; }
 mod_screenshot() {
   local out="${1:-$ADX_DOWNLOADS/screen-$(date +%Y%m%d-%H%M%S).png}"
   mkdir -p "$(dirname "$out")"
-  _adb exec-out screencap -p > "$out" && adx_log "saved $out"
+  _adb -s "emulator-$ADX_EMU_PORT" exec-out screencap -p > "$out" || adx_die "screenshot failed (is $ADX_AVD_NAME running? adx emulator status)"
+  adx_log "saved $out"
 }
