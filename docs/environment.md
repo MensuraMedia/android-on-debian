@@ -5,7 +5,8 @@ the logs are, and how to keep it working. For *why* it is built this way see
 [architecture.md](architecture.md); for symptoms and fixes see
 [troubleshooting.md](troubleshooting.md).
 
-Related: [dependencies.md](dependencies.md) (everything required, with versions) and
+Related: [claude-integration.md](claude-integration.md) (skills, MCP servers, agents, rules),
+[dependencies.md](dependencies.md) (everything required, with versions) and
 [install-issues.md](install-issues.md) (every installation problem met so far).
 
 Generate a current snapshot of any machine with:

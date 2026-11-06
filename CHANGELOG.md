@@ -14,6 +14,8 @@ the project uses [Semantic Versioning](https://semver.org/).
   template). All project diagrams are flat dark, system fonts, WCAG-checked tokens.
 - `docs/diagrams/aodm-architecture.{html,svg}`: architecture of the planned phone
   image manager.
+- `docs/claude-integration.md`: every skill, MCP server, agent, global rule,
+  permission rule and workflow, with source, pin, scope and update steps.
 - `docs/research/aodm-spike.md`: what the emulator really allows (settings,
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 

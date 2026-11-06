@@ -147,8 +147,9 @@ Profiles in `profiles/` choose which modules `adx up` installs.
 See [docs/architecture.md](docs/architecture.md) for the diagram, module contract and
 modularity rules, [docs/environment.md](docs/environment.md) for the full environment
 reference (paths, logs, Claude integration, recovery), [docs/dependencies.md](docs/dependencies.md)
-for every dependency, and [docs/install-issues.md](docs/install-issues.md) for every
-installation issue met so far.
+for every dependency, [docs/install-issues.md](docs/install-issues.md) for every
+installation issue met so far, and [docs/claude-integration.md](docs/claude-integration.md)
+for every skill, MCP server, agent and rule Claude Code uses here.
 
 ## UI/UX and code-quality resources
 
