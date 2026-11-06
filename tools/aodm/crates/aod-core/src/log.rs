@@ -18,8 +18,7 @@ pub struct Logger {
 impl Logger {
     /// Logger for this process; rotates the log first (same rule as adx).
     pub fn new(env: &Env) -> Logger {
-        let dir = env.path("ADX_LOG_DIR");
-        let path = dir.join("adx.log");
+        let path = env.path("ADX_LOG_DIR").join("adx.log");
         // shortcut: rotation can race a concurrent adx run, harmless (one extra .N file).
         let _ = rotate(
             &path,
@@ -56,12 +55,14 @@ impl Logger {
 
     fn write(&self, level: &str, msg: &str) {
         let ts = jiff::Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string();
-        // One line per entry: newlines in messages would break the log format.
-        let line = format!(
-            "{ts} {level:<5} [aodm #{}] {}\n",
-            self.run,
-            msg.replace('\n', " | ")
-        );
+        // One line per entry: line breaks become " | ", other control characters are dropped.
+        let clean: String = msg
+            .replace("\r\n", " | ")
+            .replace(['\n', '\r'], " | ")
+            .chars()
+            .filter(|c| !c.is_control() || *c == '\t')
+            .collect();
+        let line = format!("{ts} {level:<5} [aodm #{}] {clean}\n", self.run);
         if let Some(dir) = self.path.parent() {
             let _ = fs::create_dir_all(dir);
         }
@@ -84,10 +85,12 @@ pub fn rotate(path: &Path, max_bytes: u64, keep: u64) -> std::io::Result<()> {
 }
 
 /// Keep previous generations of a log (adx_log_shift): `f` -> `f.1`, `f.1` -> `f.2`, ...
+/// Like the bash version, at least one generation is kept.
 pub fn shift(path: &Path, keep: u64) -> std::io::Result<()> {
-    if !path.exists() || keep == 0 {
+    if !path.exists() {
         return Ok(());
     }
+    let keep = keep.max(1);
     let generation = |n: u64| PathBuf::from(format!("{}.{n}", path.display()));
     for n in (1..keep).rev() {
         if generation(n).exists() {
@@ -102,19 +105,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn line_format_matches_adx() {
+    fn line_format_matches_adx_and_is_one_line() {
         let dir = tempfile::tempdir().unwrap();
         let log = Logger::to_file(dir.path().join("adx.log"), "42");
-        log.info("saved image\nwith newline");
+        log.info("saved image\nwith newline\r\nand\u{1b}[31m escape");
         log.warn("w");
         let text = fs::read_to_string(log.path()).unwrap();
         let lines: Vec<_> = text.lines().collect();
         assert_eq!(lines.len(), 2);
-        // 2026-11-06 01:02:03 INFO  [aodm #42] saved image | with newline
         let l = lines[0];
         assert_eq!(&l[4..5], "-");
         assert_eq!(&l[10..11], " ");
-        assert_eq!(&l[19..], " INFO  [aodm #42] saved image | with newline");
+        assert_eq!(
+            &l[19..],
+            " INFO  [aodm #42] saved image | with newline | and[31m escape"
+        );
         assert!(lines[1].ends_with(" WARN  [aodm #42] w"));
     }
 
@@ -136,6 +141,15 @@ mod tests {
             "run2"
         );
         assert!(!dir.path().join("e.log.3").exists());
+    }
+
+    #[test]
+    fn keep_zero_behaves_like_bash() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("e.log");
+        fs::write(&f, "x").unwrap();
+        shift(&f, 0).unwrap();
+        assert!(!f.exists() && dir.path().join("e.log.1").exists());
     }
 
     #[test]

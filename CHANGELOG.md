@@ -66,6 +66,30 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- P1 code review (21 findings), among them:
+  - `adx check --staged` checked the working tree instead of the index; it now
+    checks a snapshot of exactly what is staged (and stays offline).
+  - Secret scan missed Anthropic/OpenAI-project/Google keys and keystore
+    passwords and printed neighbouring content; it now reports file + kind
+    only, and refuses keystores, `local.properties`, `google-services.json`, `.env`.
+  - A failing docs check aborted the gate before the security section; every
+    section now always runs. No crash without `origin/main`/`HEAD~1`;
+    `ADX_CHECK_BASE` (set by CI per event) is honoured.
+  - "Checksum-verified" is enforced: an empty hash fails unless
+    `ADX_ALLOW_UNVERIFIED=1`; gradle and Node use pinned checksums
+    (`ADX_GRADLE_SHA256`, new `ADX_NODE_SHA256`); raw downloads are flagged.
+  - `adx up` runs each install as its own process, so `set -e` stays active
+    inside modules (the 0.2.x fix had disabled it).
+  - aodm config kept `XDG_*`/`USER`/`LANG`, reports config errors, falls back to
+    the baked-in root; the INI editor rejects values that would inject keys,
+    keeps CRLF/BOM, saves with fsync, keeps file mode and symlinks.
+  - Pre-commit hook: ownership marker, real hooks path (`core.hooksPath`,
+    worktrees), quoted root; `remove` only deletes adx's own hook.
+  - Gate uses the pinned ShellCheck/cargo-deny; checks the Rust toolchain pins
+    agree; docs checker validates actions and handles titles/absolute links;
+    CHANGELOG rule requires a line under [Unreleased].
+  - review-change workflow: range in every prompt, unverified findings kept
+    apart, Confirmed/Plausible kept; deploy-reviewer default range fixed.
 - `adx up` aborted at the first failed install (skipping every later module)
   and exited silently on an unknown module in a profile; it now warns,
   continues, and fails at the end listing incomplete modules.

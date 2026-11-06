@@ -18,6 +18,9 @@ pub enum Error {
     },
     #[error("configuration: {0}")]
     Config(String),
+    /// A value or key that would corrupt a file (e.g. a newline injecting a second key).
+    #[error("invalid {what}: {detail}")]
+    Invalid { what: &'static str, detail: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

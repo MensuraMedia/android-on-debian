@@ -25,6 +25,10 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let env = Env::load();
     let log = Logger::new(&env);
+    if let Some(e) = &env.config_error {
+        eprintln!("aodm: warning: {e}");
+        log.warn(e);
+    }
     match cli.cmd {
         Cmd::Env => {
             log.info("env");

@@ -2,19 +2,31 @@
 //! when built by adx, the framework root (lets a standalone binary find its config).
 use std::process::Command;
 
-fn main() {
-    let rev = Command::new("git")
-        .args(["describe", "--always", "--dirty", "--abbrev=7"])
+fn git(args: &[&str]) -> Option<String> {
+    Command::new("git")
+        .args(args)
         .output()
         .ok()
         .filter(|o| o.status.success())
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".into());
+}
+
+fn main() {
+    let rev =
+        git(&["describe", "--always", "--dirty", "--abbrev=7"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=AODM_GIT={rev}");
     if let Ok(root) = std::env::var("ADX_ROOT") {
         println!("cargo:rustc-env=ADX_ROOT={root}");
     }
     println!("cargo:rerun-if-env-changed=ADX_ROOT");
-    println!("cargo:rerun-if-changed=../../../../.git/HEAD");
+    // Rebuild when the commit or the index changes (new commit, branch switch, staging).
+    // shortcut: unstaged edits don't rerun this script, so `-dirty` can lag until the next stage/commit.
+    if let Some(dir) = git(&["rev-parse", "--absolute-git-dir"]) {
+        println!("cargo:rerun-if-changed={dir}/HEAD");
+        println!("cargo:rerun-if-changed={dir}/index");
+        if let Some(r) = git(&["symbolic-ref", "-q", "HEAD"]) {
+            println!("cargo:rerun-if-changed={dir}/{r}");
+        }
+    }
 }

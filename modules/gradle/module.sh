@@ -12,11 +12,9 @@ mod_status() {
 
 mod_install() {
   local zip="$ADX_DOWNLOADS/gradle-$ADX_GRADLE_VERSION-bin.zip"
-  local sha
-  sha="$(curl -fsSL "https://services.gradle.org/distributions/gradle-$ADX_GRADLE_VERSION-bin.zip.sha256")"
   adx_log "downloading gradle $ADX_GRADLE_VERSION"
   adx_download "https://services.gradle.org/distributions/gradle-$ADX_GRADLE_VERSION-bin.zip" "$zip"
-  adx_sha256_check "$zip" "$sha"
+  adx_sha256_check "$zip" "$ADX_GRADLE_SHA256"
   mkdir -p "$HOME/.local/opt/gradle"
   unzip -q -o "$zip" -d "$HOME/.local/opt/gradle"
   adx_log "installed $(_gradle_home)"

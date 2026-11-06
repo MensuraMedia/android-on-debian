@@ -9,7 +9,7 @@ on:
   pull_request:
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
@@ -24,4 +24,7 @@ jobs:
       - name: Install devtools (ShellCheck, cargo-deny) and Rust toolchain
         run: ./adx devtools install && ./adx rust install
       - name: adx check
+        env:
+          # Diff base: the commit before the push, or the PR base (empty on new branches/tags: adx falls back).
+          ADX_CHECK_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: ./adx check

@@ -126,7 +126,8 @@ adx_cmd_up() {
       adx_log "$m: already ok"
     else
       adx_log "$m: installing"
-      if ! adx_run_module "$m" install; then
+      # Separate process: `set -e` stays active inside the module (an `if` condition would disable it).
+      if ! "$ADX_ROOT/adx" "$m" install; then
         adx_warn "$m: install failed (network? see above); continuing with the next module"
         failed="$failed $m"; continue
       fi

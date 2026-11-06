@@ -13,14 +13,15 @@ rollout safe.
 ## Inputs
 
 The caller gives you a repo and a change range (e.g. `v0.2.0..HEAD`, a branch,
-or staged changes). If not given, use `git merge-base HEAD origin/main..HEAD`
+or staged changes). If not given, use `$(git merge-base HEAD origin/main)..HEAD`
 plus uncommitted changes. Read CHANGELOG.md, HANDOFF.md, ROADMAP.md and the
 project's CLAUDE.md first.
 
 ## Rules
 
 - Read-only. Allowed: `git log/diff/show/status`, `bash -n`, `--help`/`status`/
-  `help`/`env`/`logs`/`doctor` actions, `adx check`, `cargo metadata`, reading
+  `help`/`env`/`logs`/`doctor` actions, `adx check` (never `--full`: it builds an
+  app and needs the network), `cargo metadata`, reading
   files. Never install, remove, start/stop services or emulators, push, tag,
   delete or edit. If a check would change state, describe it instead.
 - Every finding needs evidence (command + output, or exact code) and is marked

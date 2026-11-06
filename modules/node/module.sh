@@ -15,16 +15,12 @@ mod_status() {
 }
 
 mod_install() {
-  local base="https://nodejs.org/dist/v$ADX_NODE_VERSION" tarball sums expected
+  local base="https://nodejs.org/dist/v$ADX_NODE_VERSION" tarball
   tarball="node-v$ADX_NODE_VERSION-linux-x64.tar.xz"
   if [ ! -x "$(_dir)/bin/npx" ]; then
-    adx_download "$base/SHASUMS256.txt" "$ADX_DOWNLOADS/node-v$ADX_NODE_VERSION-SHASUMS256.txt"
-    sums="$ADX_DOWNLOADS/node-v$ADX_NODE_VERSION-SHASUMS256.txt"
-    expected="$(awk -v f="$tarball" '$2==f{print $1}' "$sums")"
-    [ -n "$expected" ] || adx_die "no checksum for $tarball in $sums"
     adx_log "downloading Node.js v$ADX_NODE_VERSION"
     adx_download "$base/$tarball" "$ADX_DOWNLOADS/$tarball"
-    adx_sha256_check "$ADX_DOWNLOADS/$tarball" "$expected"
+    adx_sha256_check "$ADX_DOWNLOADS/$tarball" "$ADX_NODE_SHA256"
     mkdir -p "$HOME/.local/opt"
     local tmp; tmp="$(mktemp -d "$HOME/.local/opt/.node-XXXXXX")"
     tar -xJf "$ADX_DOWNLOADS/$tarball" -C "$tmp"
