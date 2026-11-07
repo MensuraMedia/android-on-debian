@@ -112,13 +112,13 @@ pub fn wait_boot(
             return Ok(t0.elapsed());
         }
         if let Ok(Some(st)) = child.try_wait() {
-            return Err(Error::Refused(format!(
+            return Err(Error::Failed(format!(
                 "emulator exited during boot ({st}); see {} (retry, or --wipe if it keeps failing)",
                 log.display()
             )));
         }
         if t0.elapsed() >= Duration::from_secs(60) && adb.state(serial) == "unauthorized" {
-            return Err(Error::Refused(format!(
+            return Err(Error::Failed(format!(
                 "{serial} is 'unauthorized' (user data from a crashed boot?): restart it with --wipe"
             )));
         }
@@ -168,7 +168,7 @@ pub fn stop(p: &EmuProc, token: Option<&str>, grace: Duration) -> Result<Stopped
         return Ok(Stopped::Sigterm(format!("{why} (it exited anyway)")));
     }
     let pid = rustix::process::Pid::from_raw(p.pid as i32)
-        .ok_or_else(|| Error::Refused(format!("bad pid {}", p.pid)))?;
+        .ok_or_else(|| Error::Failed(format!("bad pid {}", p.pid)))?;
     rustix::process::kill_process(pid, rustix::process::Signal::TERM).map_err(|e| Error::Io {
         path: format!("pid {}", p.pid).into(),
         source: e.into(),
@@ -176,7 +176,7 @@ pub fn stop(p: &EmuProc, token: Option<&str>, grace: Duration) -> Result<Stopped
     if wait_gone(p, Duration::from_secs(15)) {
         Ok(Stopped::Sigterm(why))
     } else {
-        Err(Error::Refused(format!(
+        Err(Error::Failed(format!(
             "{} (pid {}) did not exit after SIGTERM ({why}); check it, then `kill -9 {}` as a last resort",
             p.avd, p.pid, p.pid
         )))

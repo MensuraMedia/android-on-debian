@@ -13,7 +13,12 @@ use crate::env::Env;
 pub struct Logger {
     path: PathBuf,
     run: String,
+    /// Also hands each line to this (`aodm -v` prints them on stderr).
+    pub echo: Option<fn(&str)>,
 }
+
+/// Marks audit lines: changes to images, saves, settings and config (`aodm audit`).
+pub const AUDIT: &str = "audit: ";
 
 impl Logger {
     /// Logger for this process; rotates the log first (same rule as adx).
@@ -26,7 +31,11 @@ impl Logger {
             env.num("ADX_LOG_KEEP", 5),
         );
         let run = std::env::var("ADX_RUN_ID").unwrap_or_else(|_| std::process::id().to_string());
-        Logger { path, run }
+        Logger {
+            path,
+            run,
+            echo: None,
+        }
     }
 
     /// Logger writing to an explicit file (tests, standalone phones).
@@ -34,6 +43,7 @@ impl Logger {
         Logger {
             path: path.into(),
             run: run.into(),
+            echo: None,
         }
     }
 
@@ -53,7 +63,29 @@ impl Logger {
         self.write("ERROR", msg);
     }
 
+    /// A change worth keeping in the audit trail: what, to which image, details, who.
+    pub fn audit(&self, action: &str, image: &str, detail: &str) {
+        // $USER can be set by anyone; the uid comes from the kernel.
+        let who = format!(
+            "{}, uid {}",
+            std::env::var("USER").unwrap_or_else(|_| "?".into()),
+            rustix::process::getuid().as_raw()
+        );
+        self.line(
+            "INFO",
+            &format!("{AUDIT}{action} {image}: {detail} (by {who})"),
+        );
+    }
+
+    /// Other messages never start like an audit line (they may quote user input).
     fn write(&self, level: &str, msg: &str) {
+        match msg.strip_prefix(AUDIT) {
+            Some(rest) => self.line(level, &format!("(text) audit: {rest}")),
+            None => self.line(level, msg),
+        }
+    }
+
+    fn line(&self, level: &str, msg: &str) {
         let ts = jiff::Zoned::now().strftime("%Y-%m-%d %H:%M:%S").to_string();
         // One line per entry: line breaks become " | ", other control characters are dropped.
         let clean: String = msg
@@ -63,6 +95,9 @@ impl Logger {
             .filter(|c| !c.is_control() || *c == '\t')
             .collect();
         let line = format!("{ts} {level:<5} [aodm #{}] {clean}\n", self.run);
+        if let Some(echo) = self.echo {
+            echo(line.trim_end());
+        }
         if let Some(dir) = self.path.parent() {
             let _ = fs::create_dir_all(dir);
         }
@@ -74,6 +109,40 @@ impl Logger {
             let _ = f.write_all(line.as_bytes());
         }
     }
+}
+
+/// Every line of a log and its rotated generations, oldest first (`f.N` … `f.1`, `f`).
+pub fn read_all(path: &Path) -> Vec<String> {
+    let mut gens: Vec<(u64, PathBuf)> = Vec::new();
+    let name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    for e in fs::read_dir(path.parent().unwrap_or(Path::new(".")))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let f = e.file_name().to_string_lossy().to_string();
+        if let Some(n) = f
+            .strip_prefix(&format!("{name}."))
+            .and_then(|n| n.parse().ok())
+        {
+            gens.push((n, e.path()));
+        }
+    }
+    gens.sort_by_key(|g| std::cmp::Reverse(g.0));
+    gens.push((0, path.to_path_buf()));
+    gens.iter()
+        .filter_map(|(_, p)| fs::read(p).ok())
+        .flat_map(|b| {
+            String::from_utf8_lossy(&b)
+                .lines()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 /// Size-based rotation: `adx.log` -> `.1` ... `.keep` once it reaches `max_bytes`.

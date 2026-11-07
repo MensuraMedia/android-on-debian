@@ -294,7 +294,7 @@ fn parallel<T: Send>(
             .map(|(h, name)| Outcome {
                 image: name.clone(),
                 result: h.join().unwrap_or_else(|_| {
-                    Err(Error::Refused("internal error (thread panicked)".into()))
+                    Err(Error::Failed("internal error (thread panicked)".into()))
                 }),
             })
             .collect()
@@ -327,6 +327,7 @@ pub fn stop(ctx: &Ctx, running: &[&EmuProc]) -> Vec<Outcome> {
 }
 
 /// One image's health. `ok` is false when something needs attention.
+#[derive(serde::Serialize)]
 pub struct Health {
     pub image: String,
     pub state: String,

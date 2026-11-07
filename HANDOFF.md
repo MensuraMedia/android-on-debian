@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-06 (v0.2.0 released; branch `feat/aodm` at P4)
+# Handoff — updated 2026-11-07 (v0.2.0 released; branch `feat/aodm` at P5a)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -17,7 +17,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Claude integration | Global rules + `adversarial-reviewer` agent via `claude-rules`; mobile-mcp pinned 1.0.16 |
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
-| Phone image manager | Branch `feat/aodm` (P4): `aodm list`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--running`), `save create/list/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`; installed by `adx devices install`; 65 tests incl. a fake-SDK integration test; lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
+| Phone image manager | Branch `feat/aodm` (P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
 | Push | `feat/aodm` is local only: the GitHub token lacks the `workflow` scope (the branch changes `.github/workflows/`). Fix: `gh auth refresh -h github.com -s workflow`, then `git push -u origin feat/aodm` |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
@@ -38,7 +38,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   mobile-mcp uses): by design, `--all` means all; name images to spare it.
 - Lifecycle orchestration (start/stop) has no automated fake-emulator test
   yet (real-emulator checks only); saves/clone/rename/delete have one.
-- Clones and opened saves keep the source's Android ID until P5.
+- Clones and opened saves keep the source's Android ID until P5b (identity policies).
 - `adx emulator stop && adx emulator start` back to back: stop printed
   "emulator stopped" while the emulator was still exiting, so start said
   "already running" and nothing came up (seen 2026-11-06). Wait for the
@@ -48,6 +48,16 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   worked). Workaround: `adb shell svc power stayon true` (set on adx_api37 on
   2026-11-06). Candidate fix: runtime setting "stay awake" (P5) or `adx
   emulator start`.
+- `aodm config unset ADX_EMU_GPU` (or `ADX_EMU_ENV`) on this hybrid-GPU
+  laptop is undone by the next `adx up`/`adx emulator install` (adx's
+  autoconfig adds the key when it's missing); use `config set` instead. aodm
+  says so when you unset them.
+- Exit code 3 means "refused on purpose"; P5a moved real failures (tool
+  errors, console auth, emulator died) to exit 1, but some refusal messages
+  remain broad (e.g. a damaged save refusing a restore is 3).
+- aodm work folders count as dead when `/proc/PID` is gone: two hosts sharing
+  a saves folder over NFS, or aodm in another PID namespace, could sweep a
+  live run's copy (docs/phone-image-manager.md §18).
 - The `deploy-reviewer` agent isn't loaded in sessions started before it was
   installed; such sessions run it through a general agent with its file.
 
@@ -61,10 +71,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
    clients) done, reviewed (25 findings fixed) and verified end to end on
    the real emulator; P4 (saves, clone, rename, delete) done, reviewed (24
    findings: 2 critical, all fixed or recorded) and verified end to end;
-   next P5, which starts with the CLI conventions of the command library
-   spec [docs/aodm-cli.md](docs/aodm-cli.md) (`--json`, `--dry-run`, exit
-   codes, `doctor`, `config`, `logs`, `audit`, `disk`, `gc`), then settings
-   profiles, groups, identity and locks. Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
+   P5a (CLI conventions and manager administration of
+   [docs/aodm-cli.md](docs/aodm-cli.md)) done and reviewed (25 findings,
+   fixed or recorded); next P5b: settings profiles (incl. "stay awake" for
+   the Doze issue), identity policies and security locks. Status per phase: ROADMAP.md; design: docs/phone-image-manager.md.
 2. Decide the permission-allowlist items in Open questions, then apply them in
    `templates/claude/settings.json` and let `claude-permissions` tighten rules.
 3. Push to `LinearGenetics/android-on-debian` once the account has write access

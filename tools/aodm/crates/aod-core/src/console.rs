@@ -40,7 +40,7 @@ impl Console {
         c.reply()?; // banner
         if let Some(t) = token {
             c.command(&format!("auth {t}"))
-                .map_err(|e| Error::Refused(format!("console :{port}: auth failed: {e}")))?;
+                .map_err(|e| Error::Failed(format!("console :{port}: auth failed: {e}")))?;
         }
         Ok(c)
     }
@@ -84,7 +84,7 @@ impl Console {
                 return Ok(lines.join("\n"));
             }
             if let Some(reason) = l.strip_prefix("KO:") {
-                return Err(Error::Refused(format!(
+                return Err(Error::Failed(format!(
                     "console :{}: {}",
                     self.port,
                     reason.trim()

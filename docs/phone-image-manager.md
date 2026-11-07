@@ -185,7 +185,7 @@ no TARGETS checks every image.
   log. Exit 1 when a running image isn't booted and answering, or an image is
   broken or locked by something else.
 - **Restart** stops the targets in parallel and starts every one that is now
-  stopped, even if another's stop failed (reported, exit 1). `start --wipe`
+  stopped, even if another's stop failed (reported; exit 4 when others succeeded). `start --wipe`
   refuses running images (use `restart --wipe`).
 - **Several emulators and plain adb:** `adb` without `-s` fails once two
   emulators run; set `ANDROID_SERIAL` (global rules, app template).
@@ -236,6 +236,20 @@ reason here and in [dependencies.md](dependencies.md), passes `cargo deny`
 (licences allowlist: MIT, Apache-2.0, Unicode-3.0), and comes from crates.io.
 
 ## 15. Testing *(every phase)*
+
+P5a: new tests: config value checks and `local.env` edits (other lines,
+`export<TAB>`, symlink and mode kept, multi-line values refused, injection
+refused), gc temp-file pid rule, audit line parsing (forged `audit:` text
+rejected), exit-code mapping, registry tags surviving a rewrite by the P4
+shape, every `--help` rendered, the docs/CLI gate (both directions, guarded
+against a vacuous pass), and `tests/cli.rs`: the real binary in a sandbox with
+`HOME`/`XDG_*` pointed at an empty folder that must stay empty: JSON envelope,
+exit codes 2/3, groups, tags, `--tag`, `show`, wipe and its dry run, gc and
+its dry run, delete, audit; after the reviews also `.ini` files pointing out
+of the sandbox, dry runs not sweeping, all-refused exit 3 with per-image
+codes, gc leaving foreign folders and logs. On the real emulator: a settings
+marker survived a restart and was gone after `aodm wipe`; the image then
+first-booted in 26 s.
 
 P4: 65 tests (63 unit, 2 integration); new: image lock refuses while held, per-run file cleanup,
 space check, registry `update` (schema written, newer schema refused), save
@@ -314,6 +328,8 @@ keeping mode and symlinks). Run:
 | 2026-11-06 | Plan | Rust; CLI+TUI first, GUI later; full-copy saves; identity policies; spin-offs; templates; change pipeline |
 | 2026-11-06 | P0 | Spike results: see research/aodm-spike.md (IMEI/serial/SIM fixed by emulator; Android ID must be regenerated on copies; console-driven calls/SMS) |
 | 2026-11-06 | P1 | Gate's own first run found and fixed: new files not scanned for secrets; secrets echoed into the log |
+| 2026-11-07 | P5a review | code (13) + deployment (10) findings, 2 high each; fixed: `--sandbox` could reach real image folders through a sandbox `.ini` (`path=`/`path.rel=`) and gc touched the real config folder (now: Android user home inside the sandbox, images outside it ignored, real-home writes asserted absent in tests); `--dry-run` swept leftovers; gc race with save/rename (non-recursive removal, re-check, own names and logs only); exit codes 3/5 lost for per-image failures; forged audit lines; real failures reported as refusals; `config set` of a data path stranding data, symlinked/mode-changing/multi-line `local.env` edits; JSON for `completion`/`logs`/`show`; usage-vs-failure codes; wipe order; doctor's git lock and btrfs lock lookup; docs gate both ways; P4 registry compatibility tested. Recorded: pid-based liveness (§18), `config unset` of adx-autoconfigured keys, no flock against `adx_local_set` |
+| 2026-11-07 | P5a | Command library part 1: one CLI convention layer (JSON envelope, exit codes, global flags) over every command; audit trail as marked lines in the shared `adx.log` rather than a second file; `config set` edits `local.env` (the file adx sources) with a strict value alphabet; docs/CLI gate as a unit test against the clap definition |
 | 2026-11-06 | P4 review | code (12) + deployment (12) findings; fixed: path-like image arguments could delete outside the saves dir, symlinked image folders, orphaned `cp` on Ctrl-C, leftover sweep, atomic restore swap, syncfs, `-read-only` detection, UTC ids, registry checked first, absolute dirs, saves follow a sandbox home, manifest format; recorded below: delete outside the AVD home, saves size in `adx devices` status |
 | 2026-11-06 | P4 | The emulator's own `multiinstance.lock` as aodm's image lock; coreutils `cp`/`sha256sum` instead of new crates; snapshot kept only in place |
 | 2026-11-06 | P3 | Console client instead of `adb emu` for stop/health (independent of adb); reserved ports so `adx emulator` and aodm never collide; no SIGKILL |
@@ -322,6 +338,20 @@ keeping mode and symlinks). Run:
 | 2026-11-06 | P1 review | adversarial-reviewer (21 findings) and deploy-reviewer (9 findings), all fixed; reproductions replayed in a clean clone: staged-snapshot gate, secret kinds, section continuation, shallow clone, pipe-to-shell forms, hook ownership |
 
 ## 18. Known limits (`shortcut:` ledger)
+
+- Work folders of aodm runs count as dead when `/proc/PID` is gone: a saves
+  folder shared between hosts (NFS) or aodm in another PID namespace could
+  have a live copy swept. Upgrade: a flock inside each work folder.
+- `aodm config set` takes no lock against a concurrent `adx_local_set`
+  append; one of two simultaneous edits can be lost.
+- `--sandbox` keeps the real `ANDROID_HOME` (SDK, read only), the console
+  token in `$HOME`, and `ports.lock` under `DIR/aod`: a sandboxed `start` and
+  a real one don't serialise port allocation (both still see running
+  emulators in `/proc`).
+- The audit trail lives in `adx.log` and its rotated generations, so it is
+  bounded by `ADX_LOG_MAX_KB` × `ADX_LOG_KEEP`; `who` is `$USER` plus the uid.
+- `--json` field names of `list`/`card`/`health` come from Rust struct
+  fields; renaming one changes the output (per-command JSON schemas: P9).
 
 - `budget`: an emulator started seconds ago hasn't used its RAM yet, so
   separate back-to-back `aodm start` runs can overcommit; start them in one run.

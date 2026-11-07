@@ -40,6 +40,18 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   ~/.android/avd "$ADX_AOD_SAVES_DIR"/*/` for hidden `.…partial-*`,
   `.…restore-*` or `.deleting-*` folders of interrupted runs and remove them
   by hand.
+- P5a: the first `adx devices install` after updating downloads five new
+  crates (`clap_complete`, `serde_json` and three small dependencies): it
+  needs the network once. `images.toml` may gain `[images.NAME.tags]` tables
+  (still `schema = 1`; the P4 build keeps them). Change history starts with
+  P5a: `aodm audit` doesn't show changes made by earlier builds. aodm's
+  version stays `0.3.0-dev`; scripts can't tell the new exit codes from
+  `--version` until 0.3.0.
+- Rolling back from P5a to P4: `git checkout acbb91a && ./adx devices
+  install`. Not undone: `aodm config set` edits in `config/local.env` (plain
+  `KEY="value"` lines both builds read), wiped images, logs removed by `aodm
+  gc`, a completion script you installed (`aodm completion …`; remove it by
+  hand). Tags stay in `images.toml` and come back on upgrade.
 - Rolling back: first `aodm stop` every image except `adx_api37` (older adx
   and v0.2.0's `adx emulator stop` would kill all emulators, and its
   screenshot fails with several devices); `ports.lock` and the extra
@@ -53,7 +65,7 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   `~/.diagram-design/profiles/aod-flat-dark.md`.
 
 ### Planned for 0.3.0 (approved, not yet built)
-- `aodm`: groups, bulk settings profiles, bulk
+- `aodm`: bulk settings profiles, bulk
   app deploy, broadcast/capture, terminal UI.
 - Build templates with a built-in `barebones` default; identity policies
   (`private`/`standard`/`fixed`); per-image security locks; spin-offs into
@@ -62,6 +74,33 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- aodm P5a (command library, part 1; reference: `docs/aodm-cli.md`):
+  - Conventions for every command: `--json` (one document on stdout:
+    `schema`, `command`, `ok`, `results`, `errors`), `--dry-run` (on
+    `delete`, `wipe`, `save restore/delete/prune`, `gc`, `config set/unset`;
+    any other command refuses it with exit 2 instead of running for real),
+    `-q`/`-v` (no progress / every log line on stderr), `--no-color`,
+    `--sandbox DIR` (images, registry, saves and log under DIR), global
+    `--yes`; exit codes 3 refused, 4 partial, 5 timeout; the `aodm image …`
+    group (same commands as the short forms).
+  - `aodm show NAME` (everything about one image), `aodm wipe NAME`
+    (factory reset without booting; config and identity kept), `aodm group
+    list|add|remove|delete`, `aodm tag set|unset` and the `--tag K=V`
+    selector, `aodm save show IMAGE ID` (the manifest).
+  - Manager administration: `aodm doctor` (config, framework revision, SDK,
+    KVM, registry, broken images, held locks, saves filesystem, free space,
+    leftovers; exit 1 on a failed check), `aodm config
+    list|get|set|unset|validate|path` (`set` writes `config/local.env`,
+    checked first, other lines kept), `aodm logs [-n N] [-f] [--level L]
+    [--image NAME]`, `aodm audit [--since DATE] [--image NAME]`, `aodm disk`,
+    `aodm gc`, `aodm completion bash|zsh|fish`.
+  - Audit trail: every change (save, restore, open, pin, delete, clone,
+    rename, wipe, group/tag, config set/unset, gc) is logged as an `audit:`
+    line in `adx.log` with the user.
+  - Docs/CLI gate: a test fails when a command is missing from
+    `docs/aodm-cli.md` or a command documented as done doesn't exist; every
+    `--help` is rendered in a test; `tests/cli.rs` runs the binary against a
+    sandbox (JSON envelope, exit codes, groups, tags, wipe, gc, audit).
 - `docs/aodm-cli.md`: the complete command library (specification): the
   twenty management and architecture features (inventory, lifecycle,
   provisioning, clone/rename/delete, backup/restore, groups, configuration
@@ -145,6 +184,38 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- aodm P5a reviews (code 13, deployment 10 findings):
+  - `--sandbox` could reach a real image through a sandbox `.ini` whose
+    `path=` or `path.rel=` pointed outside it (a sandboxed `wipe`/`delete`
+    could erase it): the Android user home now lives in the sandbox and
+    images whose folder resolves outside it are ignored. A sandboxed `gc` no
+    longer looks in the framework's real `config/` folder.
+  - `--dry-run` still removed leftovers of crashed runs; it now changes nothing.
+  - `gc` could race a `save create` or a `rename` onto an empty saves folder
+    and delete saves recursively: empty folders are removed non-recursively,
+    every item is re-checked just before removal, and only aodm's own folders
+    (image names) and adx's own logs (`adx.log.N`, `emulator-*.log.N`) count.
+  - Exit codes 3/5 were lost when every target failed the same way (e.g.
+    `start` of a broken image exited 1); per-image JSON results now carry a
+    `code`. Real failures (console auth, a tool's error, the emulator dying
+    during boot) exit 1 instead of 3.
+  - `aodm audit` could be fed fake entries through text quoted in another log
+    line; it now only reads lines in aodm's exact audit format, records the
+    uid next to `$USER`, and other messages can't start like an audit line.
+  - `aodm config set` of a data path (`ANDROID_AVD_HOME`, `ANDROID_USER_HOME`,
+    `ADX_AOD_HOME`, `ADX_AOD_SAVES_DIR`) refuses while the old folder holds
+    data, unless `--yes`. `local.env` edits keep a symlinked file's target and
+    the file's permissions, recognise `export<TAB>KEY=`, and refuse keys whose
+    value spans several lines; `config unset` only takes known keys.
+  - `--json completion` produced invalid JSON (now a usage error); `logs
+    --json` lines are objects; `show` results have `ok`. Malformed `--tag`,
+    unknown `config get` keys and bad `--since` dates are usage errors (2).
+  - `wipe` removes the quick-boot snapshot first (an interrupted wipe can't
+    leave it over fresh data) and sweeps leftovers next to images outside
+    the AVD home. `doctor`/`card` run `git describe` without taking git's
+    index lock; doctor's held-lock check works on btrfs.
+  - The docs/CLI gate also fails when a built command is still documented as
+    planned; the CLI test asserts nothing is written outside the sandbox.
 - aodm P4 reviews (code 12, deployment 12 findings):
   - **Critical:** the `save` commands took the image argument as a path, so
     `save delete ""`, `..` or an absolute path removed folders outside the
@@ -266,6 +337,12 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   now `${VAR:-default}` keys for adx and aodm alike, or `ANDROID_AVD_HOME`.
 - `rustix` dependency gains its `process` feature (kill, process groups); no
   new crates.
+- aodm (P5a): per-command `--yes` is now a global flag (same spelling, still
+  accepted after the command). Exit codes are more specific: a declined or
+  impossible confirmation and other refusals exit 3 (was 1), partial failures
+  4, timeouts 5, a missing selector 2. Confirmation prompts go to stderr.
+  `aodm list` adds `--tag`. New crates `serde_json` (`--json`) and
+  `clap_complete` (`completion`); see docs/dependencies.md §5b.
 - CI triggers once per change (push to `main` and tags, pull requests) and
   cancels superseded runs.
 - `origin` pushes to MensuraMedia only; LinearGenetics is a separate remote

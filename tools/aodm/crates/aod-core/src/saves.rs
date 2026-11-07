@@ -138,7 +138,7 @@ pub fn find(root: &Path, image: &str, id: &str) -> Result<Save> {
     } else {
         let mut m: Vec<Save> = all.into_iter().filter(|s| s.id.starts_with(id)).collect();
         if m.len() > 1 {
-            return Err(Error::Refused(format!(
+            return Err(Error::Failed(format!(
                 "'{id}' matches {} saves of {image}: {}",
                 m.len(),
                 m.iter()
@@ -150,7 +150,7 @@ pub fn find(root: &Path, image: &str, id: &str) -> Result<Save> {
         m.pop()
     };
     hit.ok_or_else(|| {
-        Error::Refused(format!(
+        Error::Failed(format!(
             "{image} has no save '{id}' (aodm save list {image})"
         ))
     })
@@ -184,14 +184,14 @@ pub fn hash_tree(dir: &Path) -> Result<Vec<FileSum>> {
         SLOW,
     )?;
     if !out.ok {
-        return Err(Error::Refused(format!(
+        return Err(Error::Failed(format!(
             "sha256sum failed: {}",
             out.stderr.trim()
         )));
     }
     let sums: Vec<&str> = out.stdout.split('\0').filter(|r| !r.is_empty()).collect();
     if sums.len() != files.len() {
-        return Err(Error::Refused("sha256sum: unexpected output".into()));
+        return Err(Error::Failed("sha256sum: unexpected output".into()));
     }
     files
         .into_iter()
@@ -331,12 +331,15 @@ pub fn create(ctx: &Ctx, img: &Image, label: Option<&str>) -> Result<Save> {
         ctx.log.error(&format!("save {}: {e}", img.name));
         return Err(e);
     }
-    ctx.log.info(&format!(
-        "save {}/{id}: ok ({}) in {:.1} s",
-        img.name,
-        avd::human(avd::du(&dest)),
-        t0.elapsed().as_secs_f64()
-    ));
+    ctx.log.audit(
+        "save",
+        &img.name,
+        &format!(
+            "{id} ({}) in {:.1} s",
+            avd::human(avd::du(&dest)),
+            t0.elapsed().as_secs_f64()
+        ),
+    );
     find(&root, &img.name, &id)
 }
 
@@ -466,12 +469,11 @@ pub fn restore(ctx: &Ctx, save: &Save, img: &Image) -> Result<String> {
             partial.display()
         ));
     }
-    ctx.log.info(&format!(
-        "restore {} from {}: ok in {:.1} s",
-        img.name,
-        save.id,
-        t0.elapsed().as_secs_f64()
-    ));
+    ctx.log.audit(
+        "restore",
+        &img.name,
+        &format!("from {} in {:.1} s", save.id, t0.elapsed().as_secs_f64()),
+    );
     let mut msg = format!("restored from save {}", save.id);
     if m.source != img.dir {
         msg.push_str(" (saved elsewhere: next boot is cold)");
@@ -491,7 +493,7 @@ pub fn open(ctx: &Ctx, save: &Save, new: &str) -> Result<String> {
             Some(format!("{}@{}", save.image, save.id));
     })?;
     ctx.log
-        .info(&format!("open {}/{} as {new}: ok", save.image, save.id));
+        .audit("open-save", &save.image, &format!("{} as {new}", save.id));
     Ok(format!(
         "opened save {}/{} as {new} ({}; first boot is cold; same Android ID as {} until identity policies, P5)",
         save.image,
@@ -508,12 +510,11 @@ pub fn pin(ctx: &Ctx, save: &Save, on: bool) -> Result<()> {
     } else if p.exists() {
         fs::remove_file(&p).map_err(Error::io(&p))?;
     }
-    ctx.log.info(&format!(
-        "{} {}/{}",
+    ctx.log.audit(
         if on { "pin" } else { "unpin" },
-        save.image,
-        save.id
-    ));
+        &save.image,
+        &format!("save {}", save.id),
+    );
     Ok(())
 }
 
@@ -548,12 +549,11 @@ pub fn delete(ctx: &Ctx, save: &Save) -> Result<u64> {
     if let Some(parent) = save.path.parent() {
         let _ = fs::remove_dir(parent);
     }
-    ctx.log.info(&format!(
-        "delete save {}/{}: ok ({} freed)",
-        save.image,
-        save.id,
-        avd::human(size)
-    ));
+    ctx.log.audit(
+        "delete-save",
+        &save.image,
+        &format!("{} ({} freed)", save.id, avd::human(size)),
+    );
     Ok(size)
 }
 

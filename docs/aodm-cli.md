@@ -38,26 +38,26 @@ commands that deliver it.
 
 | # | Feature | Commands | Status |
 | --- | --- | --- | --- |
-| 1 | **Inventory and status**: what exists, what runs, how big | `list`, `show`, `card` | done (`show` P5) |
+| 1 | **Inventory and status**: what exists, what runs, how big | `list`, `show`, `card` | done |
 | 2 | **Lifecycle** for one, a group or all, with budget checks | `start`, `stop`, `restart`, `health` | done |
 | 3 | **Provisioning** from templates, in batches | `create --template T --count N`, `template …` | P6 |
 | 4 | **Clone, rename, delete** | `clone`, `rename`, `delete` | done |
 | 5 | **Backup and restore** (full-copy saves, integrity-checked) | `save create/list/verify/restore/open/pin/delete/prune` | done |
-| 6 | **Grouping and selection** (groups, tags, selectors) | `group …`, `NAME… / --all / --group G / --running` | selectors done; `group` P5 |
-| 7 | **Configuration management** (profiles, plan/apply, drift) | `settings plan/apply/show/export`, `profile …` | P5 |
-| 8 | **Identity policies** (private/standard/fixed) | `identity show/apply/check/regenerate` | P5 |
-| 9 | **Policy enforcement** (security locks) | `lock show/set/unlock` | P5 |
+| 6 | **Grouping and selection** (groups, tags, selectors) | `group …`, `tag …`, `NAME… / --all / --group G / --tag K=V / --running` | done |
+| 7 | **Configuration management** (profiles, plan/apply, drift) | `settings plan/apply/show/export`, `profile …` | P5b |
+| 8 | **Identity policies** (private/standard/fixed) | `identity show/apply/check/regenerate` | P5b |
+| 9 | **Policy enforcement** (security locks) | `lock show/set/unlock` | P5b |
 | 10 | **Application deployment** | `app install/uninstall/launch/list/clear` | P6 |
 | 11 | **Remote execution and capture** | `shell`, `shot`, `record`, `logcat`, `push`, `pull` | P6 |
 | 12 | **Health monitoring and watch** | `health`, `watch` | `health` done; `watch` P8 |
-| 13 | **Resource management** (ports, RAM/CPU budget, disk quotas, retention) | `start` checks, `disk`, `ADX_AOD_*` limits | done (`disk` P5) |
-| 14 | **Audit trail** (who changed what, when, why) | `audit`, `logs` | `logs` P5; `audit` P5 |
+| 13 | **Resource management** (ports, RAM/CPU budget, disk quotas, retention) | `start` checks, `disk`, `ADX_AOD_*` limits | done |
+| 14 | **Audit trail** (who changed what, when, why) | `audit`, `logs` | done (entries from P5 on) |
 | 15 | **Import, export and portability** | `export`, `import`, `spinoff`, `adopt` | P7 |
 | 16 | **System image catalogue** (install, remove, check updates) | `sysimg list/add/remove/check` | P6 |
-| 17 | **Automation and scripting** (machine output, dry runs, stable exit codes) | `--json`, `--dry-run`, exit codes, `completion` | P5 |
-| 18 | **Self-administration** (doctor, config, version, logs, completion) | `doctor`, `config …`, `card`, `env`, `logs`, `completion` | `card`/`env` done; rest P5 |
+| 17 | **Automation and scripting** (machine output, dry runs, stable exit codes) | `--json`, `--dry-run`, exit codes, `completion` | done |
+| 18 | **Self-administration** (doctor, config, version, logs, completion) | `doctor`, `config …`, `card`, `env`, `logs`, `completion` | done |
 | 19 | **Upgrades and migrations with rollback** | `adx upgrade [--rollback]`, `adx release` | P9 |
-| 20 | **Storage management and garbage collection** | `disk`, `gc`, `move` | P5 (`move` P6) |
+| 20 | **Storage management and garbage collection** | `disk`, `gc`, `move` | done (`move` P6) |
 
 Architecture features that cut across all twenty (section 3): one core
 library under every front end (CLI, TUI, GUI), typed errors, structured
@@ -72,7 +72,7 @@ aodm [GLOBAL FLAGS] <command> [<subcommand>] [TARGETS] [FLAGS]
 ```
 
 - Images are the default noun: `aodm start pixel-a` is the same as
-  `aodm image start pixel-a` (P5 adds the `image` group; the short forms stay).
+  `aodm image start pixel-a` (the `image` group lists them together in `--help`).
 - Every other domain is a noun group with verbs: `aodm save restore`,
   `aodm group add`, `aodm config set`.
 - Verbs mean the same everywhere: `list`, `show`, `create`, `delete`,
@@ -86,11 +86,14 @@ aodm [GLOBAL FLAGS] <command> [<subcommand>] [TARGETS] [FLAGS]
 | `--all` | every image |
 | `--group G` | images in group G |
 | `--running` | narrows to running images (alone: every running image) |
-| `--tag K=V` *(P5)* | images whose registry tag K equals V |
+| `--tag K=V` | images whose registry tag K equals V (combines with `--group`) |
 
 The same selector works on every command that takes TARGETS. Commands that
-change images report one line per image and fail (exit 4) if any image
-failed, after doing the rest.
+change images report one line per image and, after doing the rest, exit 4 if
+some images failed; if all of them failed, with their shared code (all
+refused 3, all timed out 5) or 1. In `--json`, each per-image result has
+`image`, `ok`, `message` and `code`. No selector at all is a usage
+error (exit 2).
 
 ### Global flags
 
@@ -98,18 +101,18 @@ failed, after doing the rest.
 | --- | --- | --- |
 | `--help`, `-h` | help for any command or subcommand | done |
 | `--version`, `-V` | version and git revision | done |
-| `--yes` | skip typed confirmations (required without a terminal) | done per command; global P5 |
-| `--json` | machine-readable output on stdout (section "Output") | P5 |
-| `--dry-run` | print what would change, change nothing | P5 (`settings`, `prune`, `gc`, `delete`, `restore`) |
-| `-q`, `--quiet` / `-v`, `--verbose` | less / more progress on stderr | P5 |
-| `--no-color` | plain output (also when `NO_COLOR` is set or stdout isn't a terminal) | P5 |
-| `--sandbox DIR` | run against `DIR/{avd,aod,saves}` instead of the real homes (tests, demos) | P5 |
+| `--yes` | skip typed confirmations (required without a terminal) | done |
+| `--json` | machine-readable output on stdout (section "Output") | done |
+| `--dry-run` | print what would change, change nothing; other commands refuse it (exit 2) rather than run for real | done: `delete`, `wipe`, `save restore/delete/prune`, `gc`, `config set/unset`; `settings` P5b |
+| `-q`, `--quiet` / `-v`, `--verbose` | no progress on stderr / also every log line on stderr | done |
+| `--no-color` | plain output; aodm prints no colour today, the flag is accepted so scripts can always pass it | done |
+| `--sandbox DIR` | run against `DIR/{avd,aod,saves,android}` and log to `DIR/log` instead of the real homes (tests, demos); images whose folder resolves outside DIR are ignored; `config set/unset` are refused; the SDK stays the real one (read only) | done |
 
 ### Output
 
 - **stdout** carries results (tables, one line per image); **stderr** carries
   progress (`aodm: …`), warnings and errors. Piping stdout never captures
-  progress.
+  progress. A closed pipe (`aodm list | head -1`) is not an error.
 - **`--json`**: one JSON document per command, `{"schema": 1, "command":
   "...", "ok": true, "results": [...], "errors": [...]}`; per-image results
   have `image`, `ok`, `message` and command-specific fields. The schema
@@ -124,9 +127,9 @@ failed, after doing the rest.
 | 0 | success (also: nothing to do) | done |
 | 1 | failure | done |
 | 2 | usage error (unknown flag, missing argument) | done (clap) |
-| 3 | refused on purpose (running image, budget, lock, not confirmed) | P5 (today: 1) |
-| 4 | partial: some targets failed, the rest succeeded | P5 (today: 1) |
-| 5 | timeout | P5 (today: 1) |
+| 3 | refused on purpose (running image, budget, lock, not confirmed) | done |
+| 4 | partial: some targets failed, the rest succeeded | done |
+| 5 | timeout | done |
 
 ### Confirmations and safety
 
@@ -143,7 +146,7 @@ failed, after doing the rest.
 
 Every command logs to `$ADX_LOG_DIR/adx.log` with its process id
 (`[aodm #PID]`): what it did, to which image, how long it took, every
-failure and every fallback. Read it with `aodm logs` (P5) or
+failure and every fallback. Read it with `aodm logs` or
 `grep 'aodm #' ~/.local/state/adx/adx.log`. Secrets (the console token) are
 never logged.
 
@@ -160,8 +163,8 @@ the next command removes.
 
 | Command | Does | Key flags | Status |
 | --- | --- | --- | --- |
-| `aodm list [--group G]` | table: state, port, API, ABI, tag, revision, device, RAM, size, saves, groups | `--json` | done |
-| `aodm show NAME` | everything about one image: paths, config keys, registry entry, saves, locks, identity, last start | `--json` | P5 |
+| `aodm list [--group G] [--tag K=V]` | table: state, port, API, ABI, tag, revision, device, RAM, size, saves, groups | `--json` | done |
+| `aodm show NAME` | everything about one image: paths, config keys, registry entry, saves, last start (locks and identity P5b) | `--json` | done |
 | `aodm start TARGETS` | boot (port and budget checked), wait for Android | `--window`, `--cold`, `--wipe`, `--yes` | done |
 | `aodm stop TARGETS` | console `kill` (saves quick-boot), then SIGTERM; never SIGKILL | | done |
 | `aodm restart TARGETS` | stop, then start what stopped | as `start` | done |
@@ -172,7 +175,8 @@ the next command removes.
 | `aodm rename OLD NEW` | rename; saves and registry entry move along | | done |
 | `aodm delete NAME` | remove image and registry entry; saves kept | `--yes` | done |
 | `aodm move NAME DIR` | move an image's folder to another disk (rewrites `path=`) | | P6 |
-| `aodm wipe NAME` | factory-reset user data (same as `start --wipe`, without booting) | `--yes` | P5 |
+| `aodm wipe NAME` | factory-reset user data (same as `start --wipe`, without booting): removes user data, cache, encryption key and snapshots; keeps config and identity | `--yes`, `--dry-run` | done |
+| `aodm image …` | the commands of this table, grouped (`aodm image start` = `aodm start`) | | done |
 | `aodm tui` | full-screen dashboard (also: `aodm` with no arguments on a terminal) | | P8 |
 
 ## 5. Command reference: saves, groups, settings, templates, identity, locks
@@ -183,7 +187,7 @@ the next command removes.
 | --- | --- |
 | `aodm save create IMAGE [--label L]` | full copy of a stopped image with SHA-256 manifest |
 | `aodm save list [IMAGE]` | saves with size, pin, system image and emulator revision |
-| `aodm save show IMAGE ID` *(P5)* | the manifest |
+| `aodm save show IMAGE ID` | the manifest |
 | `aodm save verify IMAGE ID` | re-hash; reports missing, changed, unexpected files |
 | `aodm save restore IMAGE ID [--backup-first] [--yes]` | replace the image's state (verified first, atomic swap) |
 | `aodm save open IMAGE ID --as NEW` | the save becomes a new image |
@@ -193,7 +197,7 @@ the next command removes.
 
 IDs: exact, a unique prefix (e.g. the date), or `latest`.
 
-### Groups and tags — P5
+### Groups and tags — done
 
 | Command | Does |
 | --- | --- |
@@ -202,7 +206,7 @@ IDs: exact, a unique prefix (e.g. the date), or `latest`.
 | `aodm group delete G` | remove the group (images stay) |
 | `aodm tag set NAME K=V…` / `tag unset NAME K…` | free-form labels for `--tag` selection |
 
-### Settings profiles (configuration management) — P5
+### Settings profiles (configuration management) — P5b
 
 | Command | Does |
 | --- | --- |
@@ -230,7 +234,7 @@ stay awake, location, battery, network; over adb while running).
 | `aodm template diff IMAGE` | drift of an image from the template it was built from |
 | `aodm template export T` / `import FILE` | share templates |
 
-### Identity policies — P5
+### Identity policies — P5b
 
 | Command | Does |
 | --- | --- |
@@ -239,7 +243,7 @@ stay awake, location, battery, network; over adb while running).
 | `aodm identity check [TARGETS]` | exit 1 on duplicates between images or host leaks (time zone, locale) |
 | `aodm identity regenerate NAME` | new random identity (also done by clone/open) |
 
-### Security locks (policy enforcement) — P5
+### Security locks (policy enforcement) — P5b
 
 | Command | Does |
 | --- | --- |
@@ -295,18 +299,18 @@ stay awake, location, battery, network; over adb while running).
 | --- | --- | --- |
 | `aodm card` | version card: aodm/adx versions, host, toolchain, emulation, images | done |
 | `aodm env` | every setting with its value and source (process, config, fallback) | done |
-| `aodm doctor` | self-check: binary matches the framework, config valid and absolute paths, SDK and emulator present, KVM, locks not stale, registry readable and schema known, saves dir on a POSIX filesystem, free space, leftover work folders; exit 1 on problems | P5 |
-| `aodm config list` | the settings aodm reads (as `env`, grouped) | P5 |
-| `aodm config get KEY` | one value (script-friendly) | P5 |
-| `aodm config set KEY VALUE` | write to `config/local.env` (validated, lossless, logged) | P5 |
-| `aodm config unset KEY` | back to the default | P5 |
-| `aodm config validate` | check every key (types, ranges, absolute paths, port slots) | P5 |
-| `aodm config path` | which files are read, in which order | P5 |
-| `aodm logs [-n N] [--follow] [--image NAME] [--level warn]` | aodm's lines from `adx.log`, or an image's emulator log | P5 |
-| `aodm audit [--since DATE] [--image NAME]` | changes only (create, delete, restore, apply, unlock…), with who, what, why | P5 |
-| `aodm disk` | space per image, per image's saves, free per filesystem, leftovers | P5 |
-| `aodm gc [--dry-run]` | remove leftover work folders, empty save folders, stale lock files, rotated logs beyond `ADX_LOG_KEEP` | P5 |
-| `aodm completion bash\|zsh\|fish` | shell completion script | P5 |
+| `aodm doctor` | self-check: binary matches the framework, config valid and absolute paths, SDK and emulator present, KVM, locks not stale, registry readable and schema known, saves dir on a POSIX filesystem, free space, leftover work folders; exit 1 on problems | done |
+| `aodm config list` | the settings aodm reads (as `env`, grouped) | done |
+| `aodm config get KEY` | one value (script-friendly) | done |
+| `aodm config set KEY VALUE` | write to `config/local.env` (checked, other lines kept, symlink and permissions kept, audited); a data path whose old folder holds data needs `--yes` (move the data first) | done |
+| `aodm config unset KEY` | back to the default | done |
+| `aodm config validate` | check every key (types, ranges, absolute paths, port slots) | done |
+| `aodm config path` | which files are read, in which order | done |
+| `aodm logs [-n N] [--follow] [--image NAME] [--level warn]` | aodm's lines from `adx.log` (all rotated generations), or an image's emulator log; `--follow` stops at Ctrl-C or, like `tail -f`, at the next line after the reader closes | done |
+| `aodm audit [--since DATE] [--image NAME]` | changes only (save, restore, open, pin, delete, clone, rename, wipe, group/tag, config set/unset, gc; later apply, unlock…), with when, who and what; recorded from P5 on | done |
+| `aodm disk` | space per image, per image's saves, free per filesystem, leftovers | done |
+| `aodm gc [--dry-run]` | remove leftover work folders and temp files of dead runs, empty per-image save folders, and adx's rotated logs (`adx.log.N`, `emulator-*.log.N`) beyond `ADX_LOG_KEEP`; each item is re-checked just before removal; no prompt (it only removes aodm's own garbage), audited | done |
+| `aodm completion bash\|zsh\|fish` | shell completion script | done |
 | `aodm help [COMMAND]` / `--help` | help | done |
 | `adx devices install` / `status` / `remove` | build and install, check, uninstall aodm | done |
 | `adx upgrade [vX.Y.Z]` / `adx upgrade --rollback` | update the framework and aodm, run migrations, roll back on failure | P9 |
@@ -335,7 +339,7 @@ the process environment for keys left unset there, then built-in fallbacks.
 | `ADX_AOD_RAM_RESERVE_MB` | `2048` | host RAM kept free when starting |
 | `ADX_AVD_NAME` | `adx_api37` | adx's own image (protected) |
 | `ADX_EMU_PORT` | `5554` | its reserved port |
-| `ADX_EMU_GPU` | `host` | `host`, `auto` or `software` |
+| `ADX_EMU_GPU` | `host` | emulator `-gpu` mode: `host`, `auto`, `auto-no-window`, `software` (Lavapipe), `angle_indirect`, `guest` (the older software renderers are accepted too) |
 | `ADX_EMU_HEADLESS` | `true` | no window unless `--window` |
 | `ADX_EMU_ENV` | (empty) | `VAR=value` pairs for the emulator process |
 | `ADX_EMU_BOOT_TIMEOUT` | `240` | seconds |
@@ -365,14 +369,17 @@ The pre-commit hook (`adx devtools hook`) runs `adx check --staged`; CI runs
 
 ## 10. How the library stays complete and correct
 
-- **One source of truth:** commands are defined once (clap); `--help`,
-  completion scripts and the man page are generated from it (P5).
+- **One source of truth:** commands are defined once (clap); `--help` and
+  completion scripts are generated from it.
 - **Gate:** `adx check` fails when a command documented here as done is
   missing from `aodm --help`, or when an `aodm` command exists that this
-  document doesn't list (P5).
-- **Contract tests:** every command runs `--help` successfully; `--json`
-  output of each command is checked against its schema; exit codes are
-  asserted for refused, partial and failed runs (P5).
+  document doesn't list (done: the `docs_match_commands` test in
+  `crates/aodm/src/main.rs`, run by `adx check`; a row is done when its
+  Status cell says `done`, or its section heading ends in `— done`).
+- **Contract tests:** every command's `--help` renders (done); the `--json`
+  envelope and the exit codes for usage, refused and failed runs are asserted
+  against a sandbox (done, `crates/aodm/tests/cli.rs`); per-command JSON
+  schemas P9.
 - **Integration tests:** every image-changing command runs against a fake
   SDK in a temp directory (done for saves, clone, rename, delete; lifecycle
   with a fake emulator in P9).
@@ -385,7 +392,8 @@ The pre-commit hook (`adx devtools hook`) runs `adx check --staged`; CI runs
 | Phase | Adds to the library |
 | --- | --- |
 | P2–P4 (done) | `list`, `card`, `env`, `start`, `stop`, `restart`, `health`, `save …`, `clone`, `rename`, `delete` |
-| **P5** | conventions first: `--json`, `--dry-run`, `--quiet/--verbose`, `--no-color`, `--sandbox`, exit codes 3–5, `image` group alias; then `show`, `wipe`, `group`, `tag`, `profile`, `settings`, `identity`, `lock`/`unlock`; manager administration: `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; the docs/CLI gate |
+| **P5a** (done) | conventions: `--json`, `--dry-run`, `--quiet/--verbose`, `--no-color`, `--sandbox`, global `--yes`, exit codes 3–5, `image` group; `show`, `wipe`, `group`, `tag`, `save show`; manager administration: `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; the docs/CLI gate |
+| **P5b** | `profile`, `settings`, `identity`, `lock`/`unlock` |
 | P6 | `create --template`, `template …`, `move`, `app …`, `shell`, `shot`, `record`, `logcat`, `push`, `pull`, `geo`, `sysimg …` |
 | P7 | `spinoff`, `adopt`, `export`, `import`, `console`, `call`, `sms`, `aod-phone` |
 | P8 | `tui`, `watch` |

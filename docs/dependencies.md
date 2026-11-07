@@ -105,13 +105,15 @@ Platform APIs the example app uses instead of extra libraries:
 | Crate | Version | Scope | Purpose |
 | --- | --- | --- | --- |
 | clap | 4.6.7 (derive, default features off) | aodm | CLI |
+| clap_complete | 4.6.11 | aodm | `aodm completion bash\|zsh\|fish`, generated from the clap definition (no hand-written scripts to drift) |
+| serde_json | 1.0.154 | aodm | `--json` output (schema 1) |
 | anyhow | 1.0.104 | aodm | error context |
 | thiserror | 2.0.21 | aod-core | typed errors |
-| jiff | 0.2.39 | aod-core | log timestamps |
+| jiff | 0.2.39 | aod-core, aodm | log timestamps; `aodm show` last start |
 | serde | 1.0.229 (derive) | aod-core | registry (de)serialisation |
 | toml | 1.2.0 | aod-core | `images.toml` |
 | rustix | 1.1.6 (fs, process) | aod-core | statvfs; SIGTERM to a stuck emulator; killing a timed-out tool's process group (flock comes from `std::fs::File::lock`) |
-| tempfile | 3 | dev | test fixtures |
+| tempfile | 3 | dev (both crates) | test fixtures and CLI sandboxes |
 
 Policy (`tools/aodm/deny.toml`, checked by `adx check`): crates.io only, no wildcards, licences MIT / Apache-2.0 / Unicode-3.0, yanked crates denied.
 

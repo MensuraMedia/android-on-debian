@@ -11,13 +11,13 @@ use crate::env::Env;
 use crate::proc::EmuProc;
 use crate::registry::Registry;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Section {
     pub title: &'static str,
     pub rows: Vec<(String, String)>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ImageRow {
     pub name: String,
     pub state: String,
@@ -33,7 +33,7 @@ pub struct ImageRow {
     pub groups: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct VersionCard {
     /// Left column, then right column.
     pub left: Vec<Section>,
@@ -127,6 +127,7 @@ fn adx_version(root: &str) -> String {
     });
     let git = std::process::Command::new("git")
         .args(["-C", root, "describe", "--always", "--dirty", "--abbrev=7"])
+        .env("GIT_OPTIONAL_LOCKS", "0")
         .output()
         .ok()
         .filter(|o| o.status.success())

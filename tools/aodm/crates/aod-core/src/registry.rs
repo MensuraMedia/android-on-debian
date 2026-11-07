@@ -15,6 +15,9 @@ use crate::error::{Error, Result};
 pub struct Entry {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<String>,
+    /// Free-form labels (`aodm tag set`, selected with `--tag K=V`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tags: BTreeMap<String, String>,
     /// Pinned console port (otherwise allocated at start).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
@@ -125,6 +128,47 @@ impl Registry {
             .map(|e| e.groups.as_slice())
             .unwrap_or(&[])
     }
+
+    pub fn tag(&self, image: &str, key: &str) -> Option<&str> {
+        self.entry(image)
+            .and_then(|e| e.tags.get(key))
+            .map(String::as_str)
+    }
+
+    /// Every group with its members, sorted.
+    pub fn all_groups(&self) -> BTreeMap<&str, Vec<&str>> {
+        let mut g: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for (name, e) in &self.images {
+            for x in &e.groups {
+                g.entry(x).or_default().push(name);
+            }
+        }
+        g
+    }
+
+    /// Drops entries that hold nothing (after removing a group or tag).
+    pub fn compact(&mut self) {
+        self.images.retain(|_, e| *e != Entry::default());
+    }
+}
+
+/// Group names and tag keys: the same rule as image names.
+pub fn validate_label(what: &'static str, s: &str) -> Result<()> {
+    crate::avd::validate_name(s).map_err(|_| Error::Invalid {
+        what,
+        detail: format!("{s:?} (use letters, digits, . _ -; max 64)"),
+    })
+}
+
+/// Tag values: one line of printable text, max 128 characters.
+pub fn validate_value(s: &str) -> Result<()> {
+    if s.len() > 128 || s.chars().any(char::is_control) {
+        return Err(Error::Invalid {
+            what: "tag value",
+            detail: format!("{s:?} (one line, max 128 characters)"),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -174,6 +218,32 @@ mod tests {
         );
         fs::write(Registry::path(dir.path()), "schema = 2\n").unwrap();
         assert!(Registry::update(dir.path(), |_| {}).is_err());
+    }
+
+    /// The P4 binary knows no `tags`: its flattened `extra` table must carry them
+    /// through a rewrite (rollback, or mixed versions on one machine).
+    #[test]
+    fn older_shape_keeps_tags_table() {
+        #[derive(Serialize, Deserialize)]
+        struct P4Entry {
+            #[serde(default, skip_serializing_if = "Vec::is_empty")]
+            groups: Vec<String>,
+            #[serde(flatten)]
+            extra: toml::Table,
+        }
+        #[derive(Serialize, Deserialize)]
+        struct P4 {
+            #[serde(default)]
+            images: BTreeMap<String, P4Entry>,
+            #[serde(flatten)]
+            extra: toml::Table,
+        }
+        let text = "schema = 1\n[images.a]\ngroups = [\"qa\"]\n[images.a.tags]\nowner = \"x\"\n";
+        let old: P4 = toml::from_str(text).unwrap();
+        let rewritten = toml::to_string_pretty(&old).unwrap();
+        let back: Registry = toml::from_str(&rewritten).unwrap();
+        assert_eq!(back.tag("a", "owner"), Some("x"));
+        assert_eq!(back.groups("a"), ["qa"]);
     }
 
     #[test]

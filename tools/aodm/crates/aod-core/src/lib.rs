@@ -8,7 +8,9 @@ pub mod avd;
 pub mod budget;
 pub mod card;
 pub mod cmd;
+pub mod config;
 pub mod console;
+pub mod doctor;
 pub mod emu;
 pub mod env;
 pub mod error;
@@ -20,5 +22,6 @@ pub mod ports;
 pub mod proc;
 pub mod registry;
 pub mod saves;
+pub mod storage;
 
 pub use error::{Error, Result};

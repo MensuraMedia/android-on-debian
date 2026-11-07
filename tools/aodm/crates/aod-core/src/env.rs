@@ -20,6 +20,8 @@ pub enum Source {
     Process,
     Config,
     Fallback,
+    /// A command-line flag (`aodm --sandbox`).
+    Flag,
 }
 
 impl Source {
@@ -28,6 +30,7 @@ impl Source {
             Source::Process => "env",
             Source::Config => "config",
             Source::Fallback => "fallback",
+            Source::Flag => "flag",
         }
     }
 }
@@ -50,7 +53,7 @@ pub struct Env {
 /// Keys aodm reads, with fallbacks used only when the framework config is unavailable.
 /// shortcut: fallbacks duplicate defaults.env; a test (fallbacks_match_defaults_env)
 /// keeps them in sync while both live in this repo.
-const KEYS: &[(&str, &str)] = &[
+pub const KEYS: &[(&str, &str)] = &[
     ("ADX_ROOT", ""),
     ("ANDROID_HOME", "~/Android/Sdk"),
     // The emulator's own lookup order for AVDs: ANDROID_AVD_HOME, then
@@ -216,6 +219,18 @@ impl Env {
             "" => self.path("ANDROID_USER_HOME"),
             e => PathBuf::from(e),
         }
+    }
+
+    /// Overrides one value for this run (`--sandbox`); shown with source `flag`.
+    pub fn set(&mut self, key: &str, value: impl Into<String>) {
+        let value = value.into();
+        self.vars.insert(
+            key.to_string(),
+            Value {
+                value,
+                source: Source::Flag,
+            },
+        );
     }
 
     /// All known keys with value and source, sorted (for `aodm env`).

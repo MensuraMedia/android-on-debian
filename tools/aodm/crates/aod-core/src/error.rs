@@ -23,6 +23,9 @@ pub enum Error {
     Invalid { what: &'static str, detail: String },
     #[error("{what} timed out after {secs} s")]
     Timeout { what: String, secs: u64 },
+    /// Something went wrong (a tool failed, the emulator died): exit 1, unlike `Refused`.
+    #[error("{0}")]
+    Failed(String),
     /// aodm declines on purpose (budget, port busy, image in use): the message says what to do.
     #[error("{0}")]
     Refused(String),

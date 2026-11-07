@@ -99,9 +99,10 @@ fn registry_ok(env: &Env) -> Result<()> {
     Registry::writable(&cfg_dir(env, "ADX_AOD_HOME")?)
 }
 
-/// Leftovers of interrupted aodm runs in `dir` (hidden `.…partial-PID`, `.restore-PID`,
-/// `.old-PID`, `.deleting-…-PID`) whose process is gone: removed and logged.
-pub fn sweep(ctx: &Ctx, dir: &Path) {
+/// Hidden work folders of aodm runs in `dir` (`.…partial-PID`, `.restore-PID`, `.old-PID`,
+/// `.deleting-…-PID`), with whether their process is still alive.
+pub fn leftovers(dir: &Path) -> Vec<(PathBuf, bool)> {
+    let mut out = Vec::new();
     for e in fs::read_dir(dir).into_iter().flatten().flatten() {
         let f = e.file_name().to_string_lossy().to_string();
         let ours = f.starts_with('.')
@@ -109,22 +110,28 @@ pub fn sweep(ctx: &Ctx, dir: &Path) {
                 .iter()
                 .any(|m| f.contains(m));
         let pid = f.rsplit_once('-').map(|(_, p)| p).unwrap_or("");
-        if ours
-            && !pid.is_empty()
-            && pid.chars().all(|c| c.is_ascii_digit())
-            && !Path::new(&format!("/proc/{pid}")).exists()
-        {
-            let p = e.path();
-            let size = avd::human(avd::du(&p));
-            match fs::remove_dir_all(&p) {
-                Ok(()) => ctx.log.warn(&format!(
-                    "removed leftover of an interrupted run: {} ({size})",
-                    p.display()
-                )),
-                Err(err) => ctx
-                    .log
-                    .warn(&format!("cannot remove leftover {}: {err}", p.display())),
-            }
+        if ours && !pid.is_empty() && pid.chars().all(|c| c.is_ascii_digit()) {
+            out.push((e.path(), Path::new(&format!("/proc/{pid}")).exists()));
+        }
+    }
+    out
+}
+
+/// Leftovers of interrupted aodm runs in `dir` whose process is gone: removed and logged.
+pub fn sweep(ctx: &Ctx, dir: &Path) {
+    for (p, alive) in leftovers(dir) {
+        if alive {
+            continue;
+        }
+        let size = avd::human(avd::du(&p));
+        match fs::remove_dir_all(&p) {
+            Ok(()) => ctx.log.warn(&format!(
+                "removed leftover of an interrupted run: {} ({size})",
+                p.display()
+            )),
+            Err(err) => ctx
+                .log
+                .warn(&format!("cannot remove leftover {}: {err}", p.display())),
         }
     }
 }
@@ -196,7 +203,7 @@ pub fn copy_tree(ctx: &Ctx, src: &Path, dst: &Path) -> Result<()> {
         SLOW,
     )?;
     if !out.ok {
-        return Err(Error::Refused(format!(
+        return Err(Error::Failed(format!(
             "copy {} -> {} failed: {}",
             src.display(),
             dst.display(),
@@ -338,7 +345,7 @@ pub fn clone(ctx: &Ctx, src: &Image, name: &str) -> Result<String> {
         t0.elapsed().as_secs_f64(),
         src.name
     );
-    ctx.log.info(&format!("clone {} -> {name}: ok", src.name));
+    ctx.log.audit("clone", &src.name, &format!("as {name}"));
     Ok(msg)
 }
 
@@ -414,7 +421,7 @@ pub fn rename(ctx: &Ctx, img: &Image, new: &str) -> Result<String> {
             ))
         })?;
     }
-    ctx.log.info(&format!("rename {} -> {new}: ok", img.name));
+    ctx.log.audit("rename", &img.name, &format!("to {new}"));
     Ok(format!("renamed to {new} (next boot is cold)"))
 }
 
@@ -465,12 +472,15 @@ pub fn delete(ctx: &Ctx, img: &Image, all: &[Image]) -> Result<String> {
     let saves = crate::saves::list(&cfg_dir(ctx.env, "ADX_AOD_SAVES_DIR")?, Some(&img.name))
         .map(|l| l.len())
         .unwrap_or(0);
-    ctx.log.info(&format!(
-        "delete {}: ok ({} freed, folder {}, {saves} save(s) kept)",
-        img.name,
-        avd::human(size),
-        if folder { "removed" } else { "left alone" }
-    ));
+    ctx.log.audit(
+        "delete",
+        &img.name,
+        &format!(
+            "{} freed, folder {}, {saves} save(s) kept",
+            avd::human(size),
+            if folder { "removed" } else { "left alone" }
+        ),
+    );
     let mut msg = format!("deleted ({} freed)", avd::human(size));
     if shared {
         msg.push_str("; its folder belongs to another image and was left alone");
@@ -488,6 +498,67 @@ pub fn delete(ctx: &Ctx, img: &Image, all: &[Image]) -> Result<String> {
         ));
     }
     Ok(msg)
+}
+
+/// What `-wipe-data` resets: user data, cache, the data encryption key and every
+/// snapshot (they all hold the old data). The emulator rebuilds them from the system
+/// image at the next boot. Config, identity (`modem_simulator`) and AVD.conf stay.
+/// The snapshot goes first: an interrupted wipe must not leave a quick-boot snapshot
+/// on top of fresh user data.
+pub const WIPED: &[&str] = &[
+    "snapshots",
+    "userdata-qemu.img",
+    "userdata-qemu.img.qcow2",
+    "cache.img",
+    "cache.img.qcow2",
+    "encryptionkey.img",
+    "encryptionkey.img.qcow2",
+];
+
+/// The parts of `img` that `wipe` would remove, with their size (for `--dry-run`).
+pub fn wipe_plan(img: &Image) -> Vec<(PathBuf, u64)> {
+    WIPED
+        .iter()
+        .map(|f| img.dir.join(f))
+        .filter(|p| fs::symlink_metadata(p).is_ok())
+        .map(|p| {
+            let n = avd::du(&p);
+            (p, n)
+        })
+        .collect()
+}
+
+/// `aodm wipe NAME`: factory reset of a stopped image without booting it. The parts
+/// move into one hidden folder first, so an interrupted wipe leaves a sweepable leftover.
+pub fn wipe(ctx: &Ctx, img: &Image) -> Result<String> {
+    let _held = hold(img)?;
+    let parent = img.dir.parent().unwrap_or(Path::new("/"));
+    // For an image outside the AVD home, leftovers sit next to it, where sweep_all
+    // doesn't look.
+    sweep(ctx, parent);
+    let plan = wipe_plan(img);
+    if plan.is_empty() {
+        return Ok("nothing to wipe (already factory fresh)".into());
+    }
+    let gone = parent.join(format!(
+        ".{}.wipe.deleting-{}",
+        img.name,
+        std::process::id()
+    ));
+    fs::create_dir(&gone).map_err(Error::io(&gone))?;
+    let mut size = 0;
+    for (p, n) in &plan {
+        let to = gone.join(p.file_name().unwrap_or_default());
+        fs::rename(p, &to).map_err(Error::io(p))?;
+        size += n;
+    }
+    fs::remove_dir_all(&gone).map_err(Error::io(&gone))?;
+    ctx.log
+        .audit("wipe", &img.name, &format!("{} freed", avd::human(size)));
+    Ok(format!(
+        "wiped ({} freed); the next start is a first boot",
+        avd::human(size)
+    ))
 }
 
 #[cfg(test)]
