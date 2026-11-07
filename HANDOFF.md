@@ -106,6 +106,13 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   deployments"); both are global (`~/.claude/agents/`), read-only by
   instruction (their Bash tool is not technically restricted).
 
+## Decisions
+
+- 2026-11-07: the planned aodm manager (P8 terminal dashboard, P10 desktop
+  window) is the manager to use. The P10a "Phone Images" window is its
+  prototype: its thumbnail card grid becomes the manager's main view, built
+  on `crates/aod-gui`, not a second app.
+
 ## Open questions
 
 - **Permission allowlist (security, needs the owner's decision).** The docs

@@ -67,7 +67,7 @@ CHANGELOG/HANDOFF updates and a commit.
 | P6 | Build templates (built-in `barebones` default, `pixel8-api37`, `small-phone`, `tablet`; capture, validate, drift, batch create, provisioning); bulk app deploy, shell broadcast, screenshots, recording, logcat, push/pull, geo; system image catalogue (`sysimg`); `move` | Planned |
 | P7 | Spin-offs: standalone phones (linked / portable), `aod-phone run/control` mechanics panel, switchboard calls/SMS between phones, `adopt`, `export`/`import`, raw `console` | Planned |
 | P10a | Desktop window `aod-gui` (moved ahead on request): live screen thumbnail per image, state, Start / Stop / Save / Clone through `aodm`; menu entry "Phone Images" | Done |
-| P8 | Terminal UI and `watch`: dashboard, details, version card, templates, identity, locks, results; confirmation modals | Planned |
+| P8 | Terminal UI and `watch`: dashboard (phone cards as in the P10a window: thumbnails where the terminal can show images, text cards elsewhere), details, version card, templates, identity, locks, results; confirmation modals | Planned |
 | P9 | `adx review`, `adx release`, `adx upgrade` + migrations + `--rollback`, `adx new-module`; fake-emulator lifecycle tests; technical document `docs/phone-image-manager.md`; diagrams (saves flow, identity classes, spin-off/switchboard, change pipeline, template lifecycle); end-to-end check; **release v0.3.0** | Planned |
 
 The ten multi-device features delivered across P2–P8: inventory dashboard;
@@ -87,7 +87,7 @@ broadcast and capture; health and version card.
 
 | Feature | Notes |
 | --- | --- |
-| Desktop GUI `aod-gui`, the rest (P10) | Basic window done in P10a; still to come: saves list and restore, groups/tags editing, delete/wipe with confirmation, settings, identity, version card |
+| Desktop GUI `aod-gui`, the rest (P10) | Owner decision 2026-11-07: this planned manager is the one to use, and the P10a thumbnail cards are its main view (no separate window). Basic window done in P10a; still to come: saves list and restore, groups/tags editing, delete/wipe with confirmation, settings, identity, version card |
 | Export/import of saves between machines | Archive format for full-copy saves; system image revision check |
 | `android` CLI migration | Replace deprecated `sdkmanager`/`avdmanager` in `sdk`, `emulator` and `aodm` |
 | Compose Preview scanner | Render every `@Preview` without hand-written tests |
