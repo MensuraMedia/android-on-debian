@@ -29,4 +29,4 @@ jobs:
           ADX_CHECK_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: ./adx check
       - name: Release build and install (as adx up does)
-        run: ./adx devices install && ~/.local/bin/aodm --version && ~/.local/bin/aodm card && ~/.local/bin/aodm health
+        run: ./adx devices install && ~/.local/bin/aodm --version && ~/.local/bin/aod-gui --version && ./adx devices status && ~/.local/bin/aodm card && ~/.local/bin/aodm health

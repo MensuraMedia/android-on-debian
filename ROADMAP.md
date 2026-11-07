@@ -66,6 +66,7 @@ CHANGELOG/HANDOFF updates and a commit.
 | P5b | Settings profiles (hardware / launch / runtime, plan/apply/drift, per-image report); identity policies (`private`, `standard`, `fixed`, uniqueness check, masked audit); security locks (`lock`/`unlock`) | Planned |
 | P6 | Build templates (built-in `barebones` default, `pixel8-api37`, `small-phone`, `tablet`; capture, validate, drift, batch create, provisioning); bulk app deploy, shell broadcast, screenshots, recording, logcat, push/pull, geo; system image catalogue (`sysimg`); `move` | Planned |
 | P7 | Spin-offs: standalone phones (linked / portable), `aod-phone run/control` mechanics panel, switchboard calls/SMS between phones, `adopt`, `export`/`import`, raw `console` | Planned |
+| P10a | Desktop window `aod-gui` (moved ahead on request): live screen thumbnail per image, state, Start / Stop / Save / Clone through `aodm`; menu entry "Phone Images" | Done |
 | P8 | Terminal UI and `watch`: dashboard, details, version card, templates, identity, locks, results; confirmation modals | Planned |
 | P9 | `adx review`, `adx release`, `adx upgrade` + migrations + `--rollback`, `adx new-module`; fake-emulator lifecycle tests; technical document `docs/phone-image-manager.md`; diagrams (saves flow, identity classes, spin-off/switchboard, change pipeline, template lifecycle); end-to-end check; **release v0.3.0** | Planned |
 
@@ -86,7 +87,7 @@ broadcast and capture; health and version card.
 
 | Feature | Notes |
 | --- | --- |
-| Desktop GUI `aod-gui` (P10) | eframe/egui on `aod-core`; pure Rust (no GTK `-dev` packages, no sudo) |
+| Desktop GUI `aod-gui`, the rest (P10) | Basic window done in P10a; still to come: saves list and restore, groups/tags editing, delete/wipe with confirmation, settings, identity, version card |
 | Export/import of saves between machines | Archive format for full-copy saves; system image revision check |
 | `android` CLI migration | Replace deprecated `sdkmanager`/`avdmanager` in `sdk`, `emulator` and `aodm` |
 | Compose Preview scanner | Render every `@Preview` without hand-written tests |

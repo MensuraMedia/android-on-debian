@@ -1,0 +1,19 @@
+[package]
+name = "aod-gui"
+description = "android-on-debian phone image manager: desktop window with live phone thumbnails"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+# Same version string as aodm (git revision, ADX_ROOT): one build script.
+build = "../aodm/build.rs"
+
+[dependencies]
+aod-core.workspace = true
+eframe.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

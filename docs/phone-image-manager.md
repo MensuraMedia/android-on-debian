@@ -27,7 +27,7 @@ Cargo workspace `tools/aodm/` (edition 2024, Rust 1.95 pinned in
 | `aod-core` | P1: `env`, `log`, `ini`, `error`; P2: `avd`, `proc`, `registry`, `card` | Library, no terminal I/O; shared by every front end |
 | `aodm` | P2: `list [--group G]`, `card`, `env`, `--version` | CLI (clap); TUI from P8 |
 | `aod-phone` | P7 | Standalone phone runtime + mechanics panel |
-| `aod-gui` | future | eframe front end |
+| `aod-gui` | P10a: phone cards with live screen thumbnails; Start / Stop / Save / Clone through `aodm` | eframe window (glow; X11 or Wayland). Lists images in-process (`card::image_rows`), screenshots with raw `adb exec-out screencap` (RGBA, shrunk to 200 px), keeps the last screen in `$ADX_AOD_HOME/thumbs/NAME.thumb` (0600) |
 
 ### Built in P1
 

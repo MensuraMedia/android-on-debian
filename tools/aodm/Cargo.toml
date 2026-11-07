@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/aod-core", "crates/aodm"]
+members = ["crates/aod-core", "crates/aodm", "crates/aod-gui"]
 
 [workspace.package]
 version = "0.3.0-dev"
@@ -14,6 +14,7 @@ repository = "https://github.com/MensuraMedia/android-on-debian"
 aod-core = { path = "crates/aod-core" }
 anyhow = "1.0.104"
 clap_complete = "4.6.11"
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 jiff = "0.2.39"
 rustix = { version = "1.1.6", features = ["fs", "process"] }

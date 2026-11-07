@@ -106,7 +106,8 @@ Platform APIs the example app uses instead of extra libraries:
 | --- | --- | --- | --- |
 | clap | 4.6.7 (derive, default features off) | aodm | CLI |
 | clap_complete | 4.6.11 | aodm | `aodm completion bash\|zsh\|fish`, generated from the clap definition (no hand-written scripts to drift) |
-| serde_json | 1.0.154 | aodm | `--json` output (schema 1) |
+| serde_json | 1.0.154 | aodm, aod-gui | `--json` output (schema 1); the window reads it |
+| eframe | 0.37.0 (glow, x11, wayland, default_fonts; no accesskit, no web) | aod-gui | desktop window; pure Rust, loads X11/Wayland/GL at run time (no `-dev` packages, no GTK). Brings about 160 crates into the lock file, only for `aod-gui`; licences ISC, Zlib, OFL-1.1 and Ubuntu-font-1.0 (embedded fonts) allowed in `deny.toml` for it |
 | anyhow | 1.0.104 | aodm | error context |
 | thiserror | 2.0.21 | aod-core | typed errors |
 | jiff | 0.2.39 | aod-core, aodm | log timestamps; `aodm show` last start |

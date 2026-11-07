@@ -248,6 +248,30 @@ fn sandbox_confinement_and_exit_codes() {
     assert!(!sb.join("saves/phone").exists() && !sb.join("log/adx.log.9").exists());
     assert!(!left.exists());
 
+    // The window's thumbnails (screens can be private): rename moves, delete drops,
+    // gc removes dead temp files and screens of images that are gone.
+    let th = sb.join("aod/thumbs");
+    fs::create_dir_all(&th).unwrap();
+    make_image(sb, "shown");
+    for f in [
+        "phone.thumb",
+        "shown.thumb",
+        "ghost.thumb",
+        ".shown.thumb.999999999.tmp",
+    ] {
+        fs::write(th.join(f), "x").unwrap();
+    }
+    // `--` keeps a name like `-x` from being read as a flag (the window passes it).
+    assert_eq!(aodm(sb, &["clone", "--", "phone", "-x"]).0, 1);
+    assert_eq!(aodm(sb, &["rename", "--", "shown", "shown2"]).0, 0);
+    assert_eq!(aodm(sb, &["delete", "phone", "--yes"]).0, 0);
+    assert_eq!(aodm(sb, &["gc"]).0, 0);
+    let left: Vec<_> = fs::read_dir(&th)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(left, ["shown2.thumb"]);
+
     // Usage errors.
     assert_eq!(aodm(sb, &["--json", "completion", "bash"]).0, 2);
     assert_eq!(aodm(sb, &["list", "--tag", "a/b=c"]).0, 2);

@@ -253,7 +253,18 @@ pub fn build(
             ],
         },
     ];
-    let images = images
+    VersionCard {
+        left,
+        right,
+        images: image_rows(env, images, procs, reg),
+    }
+}
+
+/// The image table rows (`aodm list`, the window's cards). Reads no host or tool
+/// versions, so it is cheap enough to poll.
+pub fn image_rows(env: &Env, images: &[Image], procs: &[EmuProc], reg: &Registry) -> Vec<ImageRow> {
+    let sdk = env.path("ANDROID_HOME");
+    images
         .iter()
         .map(|i| ImageRow {
             name: i.name.clone(),
@@ -288,12 +299,7 @@ pub fn build(
             },
             groups: reg.groups(&i.name).join(","),
         })
-        .collect();
-    VersionCard {
-        left,
-        right,
-        images,
-    }
+        .collect()
 }
 
 /// Plain-text rendering: two even columns (each padded to its longest key and

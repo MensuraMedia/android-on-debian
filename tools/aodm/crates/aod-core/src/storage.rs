@@ -186,6 +186,39 @@ pub fn gc_plan(ctx: &Ctx) -> Result<Vec<Garbage>> {
             }
         }
     }
+    // The window's thumbnails: temp files of dead runs, and screens of images that are gone.
+    if let Ok(home) = cfg_dir(ctx.env, "ADX_AOD_HOME") {
+        let names: Vec<String> = crate::avd::scan(
+            &ctx.env.path("ANDROID_AVD_HOME"),
+            &ctx.env.android_user_home(),
+        )
+        .map(|v| v.into_iter().map(|i| i.name).collect())
+        .unwrap_or_default();
+        let scanned = !names.is_empty();
+        for e in fs::read_dir(home.join("thumbs"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            let f = e.file_name().to_string_lossy().to_string();
+            let why = if f.starts_with('.') && f.contains(".thumb.") && dead_pid_suffix(&f, ".") {
+                "temp file of an interrupted run"
+            } else if scanned
+                && f.strip_suffix(".thumb")
+                    .is_some_and(|n| !names.iter().any(|x| x == n))
+            {
+                "screen thumbnail of an image that no longer exists"
+            } else {
+                continue;
+            };
+            out.push(Garbage {
+                bytes: e.metadata().map(|m| m.len()).unwrap_or(0),
+                path: e.path(),
+                why,
+                kind: Kind::File,
+            });
+        }
+    }
     // Rotated logs beyond ADX_LOG_KEEP (adx.log.N, emulator-*.log.N).
     let keep = ctx.env.num("ADX_LOG_KEEP", 5);
     if let Ok(dir) = cfg_dir(ctx.env, "ADX_LOG_DIR") {

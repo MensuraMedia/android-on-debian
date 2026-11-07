@@ -18,6 +18,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
 | Phone image manager | Branch `feat/aodm` (P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
+| Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
 | Push | `feat/aodm` is local only: the GitHub token lacks the `workflow` scope (the branch changes `.github/workflows/`). Fix: `gh auth refresh -h github.com -s workflow`, then `git push -u origin feat/aodm` |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
@@ -29,6 +30,14 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - Menu entry installed (`adx emulator desktop`).
 
 ## Known issues
+
+- Window `aod-gui` (P10a), recorded rather than fixed:
+  - Screenshots are full raw frames (~10 MB each through adb, ~1.5 s) taken one
+    phone at a time every 5 s; with many awake phones each card updates more slowly.
+  - Headless machines (CI, servers) build the window too; no `ADX_DEVICES_GUI` switch yet.
+  - Only RGBA/RGBX screencap formats are read; other formats show "waiting for screen".
+  - Thumbnails are not counted by `aodm disk`; `gc` removes orphans only while at least one image exists.
+  - Busy state clears when `aodm` returns; the card's new state shows on the next list (≤3 s).
 
 - `feat/aodm` isn't pushed: the token lacks the `workflow` scope (see State).
 - `config/claude-global-rules.md` gained an `ANDROID_SERIAL` note (several

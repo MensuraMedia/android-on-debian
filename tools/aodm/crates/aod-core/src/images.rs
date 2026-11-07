@@ -94,6 +94,33 @@ pub fn cfg_dir(env: &Env, key: &str) -> Result<PathBuf> {
     Ok(p)
 }
 
+/// Last screen of an image, kept by the `aod-gui` window: `$ADX_AOD_HOME/thumbs/NAME.thumb`.
+pub fn thumb(env: &Env, name: &str) -> Option<PathBuf> {
+    Some(
+        cfg_dir(env, "ADX_AOD_HOME")
+            .ok()?
+            .join("thumbs")
+            .join(format!("{name}.thumb")),
+    )
+}
+
+/// Drops (`to` = None) or moves an image's thumbnail; it may show private screen
+/// content, so it must not outlive the image or its data. Missing is fine.
+fn forget_thumb(ctx: &Ctx, name: &str, to: Option<&str>) {
+    let Some(p) = thumb(ctx.env, name) else {
+        return;
+    };
+    let r = match to.and_then(|t| thumb(ctx.env, t)) {
+        Some(q) => fs::rename(&p, q),
+        None => fs::remove_file(&p),
+    };
+    if let Err(e) = r
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        ctx.log.warn(&format!("thumbnail {}: {e}", p.display()));
+    }
+}
+
 /// Fails before any disk change if the registry can't be written afterwards.
 fn registry_ok(env: &Env) -> Result<()> {
     Registry::writable(&cfg_dir(env, "ADX_AOD_HOME")?)
@@ -421,6 +448,7 @@ pub fn rename(ctx: &Ctx, img: &Image, new: &str) -> Result<String> {
             ))
         })?;
     }
+    forget_thumb(ctx, &img.name, Some(new));
     ctx.log.audit("rename", &img.name, &format!("to {new}"));
     Ok(format!("renamed to {new} (next boot is cold)"))
 }
@@ -472,6 +500,7 @@ pub fn delete(ctx: &Ctx, img: &Image, all: &[Image]) -> Result<String> {
     let saves = crate::saves::list(&cfg_dir(ctx.env, "ADX_AOD_SAVES_DIR")?, Some(&img.name))
         .map(|l| l.len())
         .unwrap_or(0);
+    forget_thumb(ctx, &img.name, None);
     ctx.log.audit(
         "delete",
         &img.name,
@@ -553,6 +582,7 @@ pub fn wipe(ctx: &Ctx, img: &Image) -> Result<String> {
         size += n;
     }
     fs::remove_dir_all(&gone).map_err(Error::io(&gone))?;
+    forget_thumb(ctx, &img.name, None);
     ctx.log
         .audit("wipe", &img.name, &format!("{} freed", avd::human(size)));
     Ok(format!(

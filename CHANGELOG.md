@@ -47,6 +47,18 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   P5a: `aodm audit` doesn't show changes made by earlier builds. aodm's
   version stays `0.3.0-dev`; scripts can't tell the new exit codes from
   `--version` until 0.3.0.
+- P10a (window `aod-gui`): `adx devices install` now also builds and installs
+  `~/.local/bin/aod-gui` and the menu entry "Phone Images". The first build
+  downloads about 300 crates (eframe; network needed once) and takes a few
+  minutes; the build folder grows to several GB with `adx check`. No `-dev`
+  packages: X11/Wayland, EGL and xkbcommon are loaded when the window opens
+  (`adx devices status` warns if missing). An `aod-gui` you put in
+  `~/.local/bin` yourself stops the install (move it away, or `ADX_FORCE=1`,
+  which also replaces a foreign `aodm`). Headless machines build it too.
+- Rolling back from P10a to P5a: on the new code `./adx devices remove`
+  (binaries, markers and menu entry), `rm -rf ~/.local/share/aod/thumbs`
+  (the window's last screens), then `git checkout 5110aa3 && ./adx devices
+  install`. The older code doesn't know the window and would leave it behind.
 - Rolling back from P5a to P4: `git checkout acbb91a && ./adx devices
   install`. Not undone: `aodm config set` edits in `config/local.env` (plain
   `KEY="value"` lines both builds read), wiped images, logs removed by `aodm
@@ -74,6 +86,17 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- Desktop window `aod-gui` (P10a, moved ahead of P5b on request), menu entry
+  "Phone Images": one card per phone image with a live thumbnail of its screen
+  (running phones every 4 s over adb; stopped phones show their last screen,
+  dimmed, kept in `$ADX_AOD_HOME/thumbs/`), state, port, device, size, saves,
+  groups, and Start / Stop… (asks first) / Save / Clone… buttons that run
+  `aodm` (same checks, logging and audit trail as the CLI). The list is read
+  in-process (nothing logged per poll); a phone whose screen is off shows
+  "screen off" and never overwrites its last screen. Thumbnails are private
+  (0600), moved by `rename`, dropped by `delete` and `wipe`, and swept by `gc`
+  when their image is gone. `aod-gui --version`. Installed by `adx devices
+  install`; adx only replaces or removes a menu entry it wrote.
 - aodm P5a (command library, part 1; reference: `docs/aodm-cli.md`):
   - Conventions for every command: `--json` (one document on stdout:
     `schema`, `command`, `ok`, `results`, `errors`), `--dry-run` (on
