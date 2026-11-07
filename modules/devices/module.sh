@@ -35,9 +35,11 @@ mod_status() {
   case "$("$g" --version 2>/dev/null)" in "aod-gui ${v#aodm }") ;; *) echo "  aod-gui is another build than aodm (adx devices install)"; return 1 ;; esac
   echo "aod-gui: $g (menu: Phone Images)"
   # Loaded at run time (the build needs no -dev packages); a warning, not a failure.
-  local lib
+  # ldconfig lives in /sbin, often not on a user's PATH. Read whole (grep -q under
+  # pipefail would fail on ldconfig's SIGPIPE).
+  local lib libs; libs="$(ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null || true)"
   for lib in libxkbcommon.so.0 libEGL.so.1; do
-    ldconfig -p 2>/dev/null | grep -q "$lib" || echo "  warning: $lib not found: the window may not open (install it with your package manager)"
+    grep -qF "$lib" <<<"$libs" || echo "  warning: $lib not found: the window may not open (install it with your package manager)"
   done
 }
 
@@ -81,7 +83,9 @@ _desktop() {
   local f; f="$(_desktop_file)"
   if [ -e "$f" ] && ! _desktop_ours; then adx_warn "$f is not adx's; menu entry left alone"; return 0; fi
   mkdir -p "$(dirname "$f")"
-  cat > "$f.new" <<DESKTOP
+  # Staged under a hidden name that still ends in .desktop (the validator requires it).
+  local tmp; tmp="$(dirname "$f")/.aod-gui.new.desktop"
+  cat > "$tmp" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Phone Images
@@ -95,8 +99,10 @@ Keywords=android;emulator;avd;adx;aodm;phone;
 StartupWMClass=aod-gui
 X-Adx-Managed=true
 DESKTOP
-  if adx_have desktop-file-validate; then desktop-file-validate "$f.new" || adx_die "invalid desktop file $f.new"; fi
-  mv -f "$f.new" "$f"
+  if adx_have desktop-file-validate && ! desktop-file-validate "$tmp"; then
+    rm -f "$tmp"; adx_die "invalid desktop file for $f"
+  fi
+  mv -f "$tmp" "$f"
   if adx_have update-desktop-database; then update-desktop-database "$(dirname "$f")" 2>/dev/null || true; fi
   adx_log "installed menu entry $f"
 }
