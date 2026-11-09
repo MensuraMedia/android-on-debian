@@ -16,6 +16,7 @@ emulator through mobile-mcp only when needed.
 | Launch the app | `adb shell am start -n @@APP_PACKAGE@@/.MainActivity` |
 | Start / stop headless emulator | `adx emulator start` / `adx emulator stop` |
 | Crash logs | `adb logcat -d *:E` |
+| Several emulators running | `export ANDROID_SERIAL=emulator-5554` first (serials: `aodm health`), else plain `adb` fails |
 
 ## UI workflow
 
@@ -55,5 +56,9 @@ permission/config decisions, fallbacks, state changes and caught errors; use
 - Keep the code modular (one screen or concern per file/package, state passed
   in as parameters) and minimal: use the ponytail skill (`/ponytail`) for the
   smallest complete change; `/ponytail-audit` to find bloat.
+- **Diagrams:** use the `diagram-design` skill. Every diagram is **flat dark**
+  (profile `aod-flat-dark`, selected by the `.diagram-design` marker): solid
+  fills, hairlines, one mint accent, no gradients/shadows/glow, system fonts.
+  Source HTML in `docs/diagrams/`, exported SVG next to it, embedded in docs.
 - Before calling a change done, run the `adversarial-reviewer` agent on what
   you touched, and record what it finds in `HANDOFF.md` if you don't fix it.

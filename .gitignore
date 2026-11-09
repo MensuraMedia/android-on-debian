@@ -7,3 +7,7 @@ config/local.env
 .vscode/
 *.swp
 .DS_Store
+
+# Vendored skills: recreate with `adx skills apply .` (pinned in config/skills.manifest)
+.claude/skills/
+__pycache__/

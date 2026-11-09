@@ -82,10 +82,27 @@ mod_autoconfig() {
 
 mod_create() {
   if _emu -list-avds 2>/dev/null | grep -qx "$ADX_AVD_NAME"; then
-    adx_log "avd $ADX_AVD_NAME exists"; return 0
+    adx_log "avd $ADX_AVD_NAME exists"
+  else
+    echo no | _avdm create avd -n "$ADX_AVD_NAME" -k "$ADX_AVD_IMAGE" -d "$ADX_AVD_DEVICE"
+    adx_log "created avd $ADX_AVD_NAME"
   fi
-  echo no | _avdm create avd -n "$ADX_AVD_NAME" -k "$ADX_AVD_IMAGE" -d "$ADX_AVD_DEVICE"
-  adx_log "created avd $ADX_AVD_NAME"
+  _avd_hw_config
+}
+
+# Hardware keys avdmanager gets wrong for desktop use. hw.keyboard=no (its
+# default) makes the emulator ignore the host keyboard. Idempotent; the
+# running emulator picks the change up at its next start.
+_avd_hw_config() {
+  local cfg="${ANDROID_AVD_HOME:-$HOME/.android/avd}/$ADX_AVD_NAME.avd/config.ini"
+  if [ ! -f "$cfg" ]; then return 0; fi
+  if grep -qx "hw.keyboard=$ADX_AVD_HW_KEYBOARD" "$cfg"; then return 0; fi
+  if grep -q '^hw\.keyboard=' "$cfg"; then
+    sed -i "s/^hw\.keyboard=.*/hw.keyboard=$ADX_AVD_HW_KEYBOARD/" "$cfg"
+  else
+    echo "hw.keyboard=$ADX_AVD_HW_KEYBOARD" >> "$cfg"
+  fi
+  adx_log "set hw.keyboard=$ADX_AVD_HW_KEYBOARD in $ADX_AVD_NAME (applies from the next start)"
 }
 
 # adx emulator start [--window] [--wipe] [--notify]
@@ -132,7 +149,7 @@ mod_start() {
   # Poll instead of `adb wait-for-device` so a crashed emulator fails fast.
   until [ "$(_adb -s "emulator-$ADX_EMU_PORT" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
     kill -0 "$pid" 2>/dev/null || adx_die "emulator exited during boot — see $(_log); retry, or use --wipe if it keeps failing"
-    if [ $((SECONDS - t0)) -ge 60 ] && _adb devices | grep -q '^emulator-.*unauthorized'; then
+    if [ $((SECONDS - t0)) -ge 60 ] && _adb -s "emulator-$ADX_EMU_PORT" get-state 2>&1 | grep -q unauthorized; then
       adx_die "device is 'unauthorized' (user data from a crashed boot?) — run: adx emulator stop && adx emulator start --wipe"
     fi
     [ $((SECONDS - t0)) -ge "$ADX_EMU_BOOT_TIMEOUT" ] && adx_die "boot timed out — see $(_log)"
@@ -146,7 +163,8 @@ mod_start() {
 mod_stop() {
   [ "${1:-}" = --notify ] && _ADX_NOTIFY=true
   local s pid i
-  for s in $(_adb devices | awk '/^emulator-/{print $1}'); do _adb -s "$s" emu kill >/dev/null 2>&1 || true; done
+  # Only this AVD's emulator: other emulators (aodm images, spin-offs) keep running.
+  _adb -s "emulator-$ADX_EMU_PORT" emu kill >/dev/null 2>&1 || true
   pid="$(_pid)"
   if [ -n "$pid" ]; then
     for i in $(seq 1 15); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
@@ -200,5 +218,6 @@ mod_accel() { _emu -accel-check; }
 mod_screenshot() {
   local out="${1:-$ADX_DOWNLOADS/screen-$(date +%Y%m%d-%H%M%S).png}"
   mkdir -p "$(dirname "$out")"
-  _adb exec-out screencap -p > "$out" && adx_log "saved $out"
+  _adb -s "emulator-$ADX_EMU_PORT" exec-out screencap -p > "$out" || adx_die "screenshot failed (is $ADX_AVD_NAME running? adx emulator status)"
+  adx_log "saved $out"
 }

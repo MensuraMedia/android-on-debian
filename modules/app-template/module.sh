@@ -45,5 +45,5 @@ mod_new() {
   if [ "$ADX_APP_GIT_INIT" = true ] && adx_have git; then
     git -C "$dest" init -q
   fi
-  adx_log "done. Next: cd $dest && ./gradlew recordRoborazziDebug"
+  adx_log "done. Next: cd $dest && ./gradlew recordRoborazziDebug  (creates the screenshot baselines in app/src/test/screenshots/; commit them so verifyRoborazziDebug can guard against regressions)"
 }

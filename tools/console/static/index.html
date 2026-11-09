@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>adx console</title>
+<meta name="description" content="Local console for android-on-debian: phone images, apps, modules, skills.">
+<style>
+:root{
+  --ground:#f5f6f8; --surface:#ffffff; --surface-2:#eef0f4; --ink:#1a1f27; --ink-soft:#5a6472;
+  --border:#dfe3ea; --border-strong:#c7cdd8;
+  --accent:#4f6bed; --accent-ink:#ffffff; --accent-soft:#e7ebfd;
+  --ok:#2f9e6b; --ok-soft:#e2f2ea; --warn:#c47a12; --warn-soft:#f8efdc; --bad:#cf4436; --bad-soft:#f8e3e1;
+  --pending:#97a1b0; --pending-soft:#eceef2;
+  --shadow:0 1px 2px rgba(20,28,44,.05),0 6px 20px rgba(20,28,44,.06);
+  --mono:ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,Cantarell,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0e1218; --surface:#171d26; --surface-2:#1f2732; --ink:#e6e9ee; --ink-soft:#9aa5b4;
+  --border:#28313d; --border-strong:#374252;
+  --accent:#7d92f2; --accent-ink:#0e1218; --accent-soft:#20293a;
+  --ok:#4cc088; --ok-soft:#16271f; --warn:#e0a13e; --warn-soft:#2b2213; --bad:#e56a5d; --bad-soft:#2c1917;
+  --pending:#6b7686; --pending-soft:#1c232d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --ground:#0e1218; --surface:#171d26; --surface-2:#1f2732; --ink:#e6e9ee; --ink-soft:#9aa5b4;
+  --border:#28313d; --border-strong:#374252;
+  --accent:#7d92f2; --accent-ink:#0e1218; --accent-soft:#20293a;
+  --ok:#4cc088; --ok-soft:#16271f; --warn:#e0a13e; --warn-soft:#2b2213; --bad:#e56a5d; --bad-soft:#2c1917;
+  --pending:#6b7686; --pending-soft:#1c232d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600;letter-spacing:-.01em}
+a{color:var(--accent)} .mono{font-family:var(--mono)}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:4px;padding:18px 14px}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 14px}
+.brand .glyph{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-family:var(--mono);font-weight:700;font-size:15px}
+.brand b{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:-.02em}
+.brand span{display:block;font-size:11px;color:var(--ink-soft)}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;color:var(--ink-soft);font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer}
+.nav button:hover{background:var(--surface-2);color:var(--ink)}
+.nav button[aria-current="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.nav .dot{width:7px;height:7px;border-radius:50%;background:var(--pending);flex:none}
+.nav button[aria-current="true"] .dot{background:var(--accent)}
+.nav .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.statusbox{margin-top:auto;border:1px solid var(--border);border-radius:10px;padding:11px;background:var(--surface-2)}
+.statusbox .lamp{display:flex;align-items:center;gap:8px;font-weight:600}
+.lamp .bulb{width:9px;height:9px;border-radius:50%;background:var(--pending)}
+.statusbox.on .bulb{background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
+.statusbox p{margin:8px 0 0;font-size:11.5px;color:var(--ink-soft)}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5}
+.topbar h1{font-size:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:5px 11px;font-size:12px;background:var(--surface)}
+.chip .bulb{width:7px;height:7px;border-radius:50%;background:var(--pending)}
+.spacer{flex:1}
+.iconbtn{display:inline-grid;place-items:center;padding:0;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);border-radius:8px;width:34px;height:34px;cursor:pointer}
+.iconbtn:hover{color:var(--ink);border-color:var(--border-strong)}
+.wrap{padding:22px 24px;max-width:1100px}
+.panel-hidden{display:none}
+.mini{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.card .hd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.card .hd h2{font-size:13.5px}
+.card .bd{padding:16px}
+.empty{background:var(--surface);padding:16px;color:var(--ink-soft);font-size:12.5px;border:1px dashed var(--border-strong);border-radius:12px}
+
+.ico{display:inline-block;width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+.ico.spin{animation:spin 1s linear infinite} @keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.ico.spin{animation:none}}
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;font-size:12.5px;padding:7px 12px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+.btn:hover{border-color:var(--accent)} .btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.iconbtn:focus-visible,.nav button:focus-visible,.thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)} .tag.off{background:var(--pending-soft);color:var(--pending)}
+.tag.run{background:var(--accent-soft);color:var(--accent)}
+
+/* horizontal cards: phone (or app) thumbnail · title most prominent · facts · status + buttons */
+.sec{margin:0 0 24px}
+.sec-hd{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.sec-hd h2{font-size:14px} .sec-hd .n{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-left:auto}
+.list{display:flex;flex-direction:column;gap:10px}
+.hcard{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:18px;align-items:center;min-height:112px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.handset{width:32px;height:58px;border:2px solid var(--border-strong);border-radius:8px;position:relative;justify-self:center}
+.handset::after{content:"";position:absolute;left:50%;top:4px;width:8px;height:2px;margin-left:-4px;border-radius:2px;background:var(--border-strong)}
+.hcard.live .handset{border-color:var(--accent)} .hcard.live .handset::after{background:var(--accent)}
+.chipset{width:44px;height:44px;border:2px solid var(--border-strong);border-radius:10px;justify-self:center;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink-soft)}
+.thumb{width:44px;height:80px;border:2px solid var(--border-strong);border-radius:9px;overflow:hidden;justify-self:center;padding:0;background:var(--surface-2);cursor:zoom-in}
+.thumb img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.hcard .title{font-size:21px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.hcard .sub{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:3px;word-break:break-all}
+.hcard .facts{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:9px;font-size:12px;color:var(--ink-soft)}
+.hcard .facts b{color:var(--ink);font-weight:600}
+.hcard .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+.hcard .side small{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px}
+@media(max-width:720px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .nav{flex-direction:row;flex-wrap:wrap;margin:0} .statusbox{display:none}
+  .hcard{grid-template-columns:40px 1fr}.hcard .side{grid-column:1/-1;align-items:flex-start}.acts,.tags{justify-content:flex-start}
+}
+
+/* tables + logs */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+td.mono{font-size:12px;word-break:break-all}
+pre.log{margin:0;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.45;max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.job{border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:10px}
+.job summary{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;list-style:none}
+.job summary::-webkit-details-marker{display:none}
+.job summary b{font-size:13px} .job summary .when{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.job pre.log{border:0;border-top:1px solid var(--border);border-radius:0 0 12px 12px;max-height:320px}
+.filter{width:100%;font:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:9px;background:var(--surface);color:var(--ink);margin-bottom:10px}
+
+.modal-scrim{position:fixed;inset:0;background:rgba(10,14,20,.6);display:grid;place-items:center;padding:20px;z-index:50}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);max-width:1000px;width:100%;max-height:90vh;overflow:auto}
+.modal .mhd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;padding:16px}
+.gallery figure{margin:0} .gallery img{width:100%;border:1px solid var(--border);border-radius:10px;display:block}
+.gallery figcaption{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:5px;word-break:break-all}
+footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px solid var(--border);margin-top:auto}
+</style>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="glyph">A</div><div><b>adx console</b><span>android-on-debian</span></div></div>
+    <nav class="nav" id="nav" aria-label="Sections"></nav>
+    <div class="statusbox" id="emubox">
+      <div class="lamp"><span class="bulb"></span><span id="emu-label">Emulators: checking…</span></div>
+      <p id="emu-note">Phones run on the official Android Emulator, managed by aodm.</p>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1 id="view-title">Images</h1>
+      <span class="chip" id="conn" title=""><span class="bulb"></span> <span id="conn-txt">Checking…</span></span>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="refresh" title="Refresh this page" aria-label="Refresh this page"></button>
+      <button class="iconbtn" id="theme" title="Toggle theme" aria-label="Toggle theme"></button>
+    </header>
+
+    <section class="wrap" id="view-images">
+      <p class="mini">Emulator phones (AVDs, managed by <span class="mono">aodm</span>) and the Android system images they boot from. Launch opens the phone in a window; Save makes a full copy of a stopped phone.</p>
+      <div id="images-body"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-apps">
+      <p class="mini">Apps in <span class="mono" id="apps-dir">~/projects/android-apps</span> (each its own git repo, made with <span class="mono">adx app-template new</span>). Render runs the Roborazzi screenshot tests on the JVM; Run installs on the running emulator and opens the app.</p>
+      <div id="apps-body"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-modules">
+      <div class="card">
+        <div class="hd"><h2>Modules</h2><span class="mono" id="mod-count" style="margin-left:auto;font-size:12px;color:var(--ink-soft)"></span><span id="doctor-slot"></span></div>
+        <div class="bd"><p class="mini">Each capability of the framework is a module (<span class="mono">modules/&lt;name&gt;/module.sh</span>). Install is idempotent and needs no root; output goes to Activity.</p>
+          <table><thead><tr><th>Module</th><th>Status</th><th>Description</th><th></th></tr></thead><tbody id="mod-rows"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-skills">
+      <div class="card">
+        <div class="hd"><h2>Claude Code skills</h2><span class="mono" id="skill-count" style="margin-left:auto;font-size:12px;color:var(--ink-soft)"></span></div>
+        <div class="bd"><p class="mini">Pinned in <span class="mono">config/skills.manifest</span> and vendored into each app's <span class="mono">.claude/skills/</span> (skills only, no plugin hooks). Change the manifest, then <span class="mono">adx skills apply &lt;app-dir&gt;</span>.</p>
+          <table><thead><tr><th>Skill</th><th>Source</th><th>Pinned commit</th><th>In apps</th></tr></thead><tbody id="skill-rows"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-activity">
+      <div class="sec">
+        <div class="sec-hd"><h2>Jobs started here</h2><span class="n" id="job-count"></span></div>
+        <div id="jobs"></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Framework log</h2><span class="mono" id="log-path" style="margin-left:auto;font-size:12px;color:var(--ink-soft)"></span></div>
+        <div class="bd"><input class="filter" id="log-filter" type="search" placeholder="Filter lines (e.g. aodm, ERROR, emulator)" aria-label="Filter log lines"><pre class="log" id="log-text"></pre></div>
+      </div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-settings">
+      <div class="card" style="margin-bottom:16px">
+        <div class="hd"><h2>Configuration</h2><span class="mono" style="margin-left:auto;font-size:12px;color:var(--ink-soft)">read-only</span></div>
+        <div class="bd"><p class="mini">Values from <span class="mono">config/defaults.env</span>, overridden per machine by <span class="mono">config/local.env</span> (git-ignored). Edit those files (or <span class="mono">aodm config set</span>) and re-run the module.</p>
+          <table><thead><tr><th>Key</th><th>Value</th><th>From</th><th>Note</th></tr></thead><tbody id="set-rows"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Environment report</h2><span class="mono" style="margin-left:auto;font-size:12px;color:var(--ink-soft)">adx env</span></div>
+        <div class="bd"><pre class="log" id="env-text"></pre></div>
+      </div>
+    </section>
+
+    <footer>Runs locally at 127.0.0.1 · no account, no cloud · every action runs as a logged job · <span class="mono">adx console stop</span> to close.</footer>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+/* Phosphor icons (static/icons, MIT), drawn as masks so they take currentColor */
+const ICON=(n,spin)=>`<span class="ico${spin?" spin":""}" aria-hidden="true" style="--i:url('/static/icons/${n}.svg')"></span>`;
+const ICONTXT=(n,t,spin)=>`${ICON(n,spin)}<span>${esc(t)}</span>`;
+const getJSON=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json();};
+
+let TOKEN=null;
+async function post(url,body){
+  if(!TOKEN)TOKEN=(await getJSON("/api/token")).token;
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","X-Adx-Token":TOKEN},body:JSON.stringify(body||{})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok===false)throw new Error(d.reason||("HTTP "+r.status));
+  return d;
+}
+function button(icon,label,cls,onclick,disabled,title){
+  const b=el("button","btn"+(cls?" "+cls:""),ICONTXT(icon,label));
+  b.disabled=!!disabled;if(title)b.title=title;
+  if(onclick)b.onclick=async()=>{b.disabled=true;b.innerHTML=ICONTXT("circle-notch",label,true);
+    try{await onclick();}catch(e){if(e.message!=="cancelled")alert(`${label}: ${e.message}`);}
+    watchJobs();refreshView();};
+  return b;
+}
+function hcard({thumb,title,sub,facts,tags,small,acts,live}){
+  const c=el("article","hcard"+(live?" live":""));
+  c.append(thumb||el("div","handset"));
+  c.append(el("div","",`<div class="title">${esc(title)}</div><div class="sub">${esc(sub||"")}</div><div class="facts">${
+    (facts||[]).filter(f=>f[1]!==""&&f[1]!=null).map(([k,v])=>`<span>${esc(k)} <b>${esc(v)}</b></span>`).join("")}</div>`));
+  const side=el("div","side");
+  side.append(el("div","tags",tags||""));
+  if(small)side.append(el("small","",esc(small)));
+  const a=el("div","acts");(acts||[]).forEach(x=>a.append(x));side.append(a);
+  c.append(side);return c;
+}
+function section(title,count,unit,cards,empty){
+  const s=el("section","sec");
+  s.append(el("div","sec-hd",`<h2>${esc(title)}</h2><span class="n">${count} ${unit}${count===1?"":"s"}</span>`));
+  const l=el("div","list");
+  if(cards.length)cards.forEach(c=>l.append(c));else l.append(el("div","empty",empty));
+  s.append(l);return s;
+}
+const busyTag=b=>b?`<span class="tag run">${esc({start:"launching",stop:"stopping",save:"saving",render:"rendering",run:"installing",install:"installing"}[b]||b)}</span>`:"";
+
+/* ---- Images ---- */
+async function loadImages(){
+  const body=$("#images-body");
+  let d;try{d=await getJSON("/api/images");}catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
+  body.innerHTML="";
+  const phones=(d.phones||[]).map(p=>hcard({
+    live:p.running, title:p.phone, sub:`${p.name} · ${p.abi}`,
+    facts:[["Android API",p.api],["Image",p.variant],["Screen",p.screen],["RAM",p.ram],["Disk",p.size],["Saves",p.saves==="-"?"none":p.saves],["Groups",p.groups]],
+    tags:busyTag(p.busy)||(p.running?`<span class="tag ok">${esc(p.state)}</span>`:'<span class="tag off">stopped</span>')+
+      (p.keyboard==="yes"?"":'<span class="tag warn" title="adx emulator install sets hw.keyboard=yes">no host keyboard</span>'),
+    acts:[
+      button("play",p.running?"Running":"Launch","primary",()=>post(`/api/images/${encodeURIComponent(p.name)}/start`),p.running||p.busy),
+      button("stop","Stop","",()=>post(`/api/images/${encodeURIComponent(p.name)}/stop`),!p.running||p.busy),
+      button("floppy-disk","Save","",()=>post(`/api/images/${encodeURIComponent(p.name)}/save`),p.running||p.busy,p.running?"Stop the phone first: a save copies a stopped image":"Full copy with checksums (aodm save create)"),
+    ]}));
+  body.append(section("Emulator phones",phones.length,"phone",phones,
+    d.aodm?"No emulator phones yet: adx emulator install creates one.":"aodm not found: install it with adx devices install."));
+  const sys=(d.system_images||[]).map(s=>hcard({
+    thumb:el("div","chipset",esc(String(s.title).replace(/\D+/,"").split(".")[0]||"?")),
+    title:`${s.title} · ${s.variant}`, sub:s.package,
+    facts:[["ABI",s.abi],["Revision",s.revision],["Extension level",s.extension]],
+    tags:s.used_by.length?`<span class="tag ok">used by ${s.used_by.length}</span>`:'<span class="tag off">unused</span>',
+    small:s.used_by.join(", "),
+    acts:[button("folder-open","Open folder","",()=>post("/api/system-images/open",{path:s.path}))]}));
+  body.append(section("System images",sys.length,"image",sys,"No system images installed: adx emulator install adds the one in config/defaults.env."));
+}
+
+/* ---- Apps ---- */
+function gallery(app){
+  const scrim=el("div","modal-scrim");const close=()=>scrim.remove();
+  scrim.onclick=e=>{if(e.target===scrim)close();};
+  const m=el("div","modal");
+  const hd=el("div","mhd",`<h3>${esc(app.name)} · <span class="mono" style="font-size:12px;color:var(--ink-soft)">${esc(app.shot_dir)}</span></h3>`);
+  const x=el("button","iconbtn",ICON("x"));x.style.marginLeft="auto";x.setAttribute("aria-label","Close");x.onclick=close;hd.append(x);
+  const g=el("div","gallery","Loading…");m.append(hd,g);scrim.append(m);document.body.append(scrim);
+  document.addEventListener("keydown",function k(e){if(e.key==="Escape"){close();document.removeEventListener("keydown",k);}});
+  getJSON(`/api/apps/${encodeURIComponent(app.name)}/shots`).then(d=>{g.innerHTML="";
+    d.shots.forEach(f=>g.append(el("figure","",`<img loading="lazy" src="/api/apps/${encodeURIComponent(app.name)}/shot/${encodeURIComponent(f)}" alt="${esc(f)}"><figcaption>${esc(f)}</figcaption>`)));});
+}
+async function loadApps(){
+  const body=$("#apps-body");
+  let d;try{d=await getJSON("/api/apps");}catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
+  $("#apps-dir").textContent=d.dir;
+  const devs=(await getJSON("/api/devices").catch(()=>({devices:[]}))).devices||[];
+  body.innerHTML="";
+  const cards=(d.apps||[]).map(a=>{
+    let thumb=null;
+    if(a.shots){thumb=el("button","thumb");thumb.title=`${a.shots} screenshots: open`;thumb.setAttribute("aria-label",`Open ${a.name} screenshots`);
+      thumb.onclick=()=>gallery(a);
+      getJSON(`/api/apps/${encodeURIComponent(a.name)}/shots`).then(s=>{if(s.shots[0])thumb.innerHTML=`<img alt="" src="/api/apps/${encodeURIComponent(a.name)}/shot/${encodeURIComponent(s.shots[0])}">`;}).catch(()=>{});}
+    return hcard({thumb,title:a.name,sub:a.package||"no applicationId",
+      facts:[["Screenshots",a.shots||"none yet"],["Branch",a.branch],["Last commit",a.last_commit],["Skills",a.skills.length||"none"],["CLAUDE.md",a.has_claude_md?"yes":"missing"]],
+      tags:busyTag(a.busy),small:a.path,
+      acts:[
+        button("image","Render","",()=>post(`/api/apps/${encodeURIComponent(a.name)}/render`),a.busy==="render","Run the Roborazzi screenshot tests (./gradlew recordRoborazziDebug)"),
+        button("rocket-launch","Run","primary",()=>post(`/api/apps/${encodeURIComponent(a.name)}/run`),a.busy==="run"||!devs.length,devs.length?"Install on the running emulator and open it":"Launch an emulator phone first (Images)"),
+        button("folder-open","Open folder","",()=>post(`/api/apps/${encodeURIComponent(a.name)}/open`)),
+      ]});
+  });
+  body.append(section("Apps",cards.length,"app",cards,"No apps yet: adx app-template new <Name> <package>."));
+}
+
+/* ---- Modules ---- */
+async function loadModules(){
+  const rows=$("#mod-rows");
+  let d;try{d=await getJSON("/api/modules");}catch(e){rows.innerHTML='<tr><td colspan="4">Console backend not reachable.</td></tr>';return;}
+  const ms=d.modules||[];const ok=ms.filter(m=>m.status==="ok").length;
+  $("#mod-count").textContent=`${ok}/${ms.length} ok`;
+  const slot=$("#doctor-slot");slot.innerHTML="";
+  slot.append(button("stethoscope","Run doctor","",()=>post("/api/modules/all/doctor"),false,"adx doctor: detailed status of every module (output in Activity)"));
+  rows.innerHTML="";
+  ms.forEach(m=>{
+    const tr=el("tr","",`<td class="mono"><b>${esc(m.name)}</b></td><td>${m.busy?busyTag("install"):`<span class="tag ${m.status==="ok"?"ok":"warn"}">${esc(m.status)}</span>`}</td><td>${esc(m.desc)}</td>`);
+    const td=el("td");td.style.textAlign="right";
+    if(m.status!=="ok")td.append(button("download-simple","Install","",async()=>{
+      if(!confirm(`Run "adx ${m.name} install"? Output appears in Activity.`))throw new Error("cancelled");
+      return post(`/api/modules/${encodeURIComponent(m.name)}/install`);},m.busy));
+    tr.append(td);rows.append(tr);
+  });
+}
+
+/* ---- Skills ---- */
+async function loadSkills(){
+  const rows=$("#skill-rows");
+  let d;try{d=await getJSON("/api/skills");}catch(e){rows.innerHTML='<tr><td colspan="4">Console backend not reachable.</td></tr>';return;}
+  $("#skill-count").textContent=`${d.skills.length} skills`;
+  rows.innerHTML="";
+  d.skills.forEach(s=>rows.append(el("tr","",`<td><b class="mono">${esc(s.name)}</b><div style="font-size:12px;color:var(--ink-soft)">${esc(s.note)}</div></td>`+
+    `<td><a href="https://github.com/${esc(s.repo)}" target="_blank" rel="noopener" class="mono" style="display:inline-flex;gap:5px;align-items:center">${esc(s.repo)}${ICON("arrow-square-out")}</a><div class="mono" style="font-size:11px;color:var(--ink-soft)">${esc(s.path)}</div></td>`+
+    `<td class="mono">${esc(s.commit.slice(0,12))}</td><td>${s.apps.length?s.apps.map(a=>`<span class="tag ok">${esc(a)}</span>`).join(" "):'<span class="tag off">none</span>'}</td>`)));
+}
+
+/* ---- Activity: jobs + adx.log ---- */
+let LOG="";
+async function loadActivity(){
+  try{
+    const d=await getJSON("/api/jobs");const box=$("#jobs");
+    const open=new Set([...box.querySelectorAll("details[open]")].map(x=>x.dataset.id));
+    $("#job-count").textContent=`${d.jobs.length} job${d.jobs.length===1?"":"s"}`;
+    box.innerHTML="";
+    if(!d.jobs.length)box.append(el("div","empty","Nothing started from the console yet. Buttons on Images, Apps and Modules run here."));
+    d.jobs.forEach((j,i)=>{
+      const cls={running:"run",ok:"ok",failed:"bad"}[j.status];
+      const det=el("details","job");det.dataset.id=j.id;if(open.has(j.id)||(i===0&&j.status==="running"))det.open=true;
+      det.innerHTML=`<summary>${j.status==="running"?ICON("circle-notch",true):ICON(j.status==="ok"?"check":"x")}<b>${esc(j.kind)} · ${esc(j.target)}</b><span class="tag ${cls}">${esc(j.status)}${j.exit!=null&&j.exit!==0?" ("+j.exit+")":""}</span><span class="when">${esc(j.started)}${j.ended?" → "+esc(j.ended.slice(11)):""}</span></summary><pre class="log">${esc(j.tail)}</pre>`;
+      box.append(det);
+    });
+  }catch(e){}
+  try{const l=await getJSON("/api/log");$("#log-path").textContent=l.path;LOG=l.text;renderLog();}catch(e){}
+}
+function renderLog(){
+  const q=($("#log-filter").value||"").toLowerCase();
+  const lines=LOG.split("\n").filter(x=>!q||x.toLowerCase().includes(q));
+  const pre=$("#log-text");pre.textContent=lines.join("\n")||"(no matching lines)";pre.scrollTop=pre.scrollHeight;
+}
+$("#log-filter").oninput=renderLog;
+
+/* ---- Settings ---- */
+async function loadSettings(){
+  let d;try{d=await getJSON("/api/settings");}catch(e){$("#set-rows").innerHTML='<tr><td colspan="4">Console backend not reachable.</td></tr>';return;}
+  const rows=$("#set-rows");rows.innerHTML="";
+  d.values.forEach(v=>rows.append(el("tr","",`<td class="mono"><b>${esc(v.key)}</b></td><td class="mono">${esc(v.value)}</td><td>${v.source==="local.env"?'<span class="tag warn">local.env</span>':'<span class="tag off">defaults</span>'}</td><td>${esc(v.note)}</td>`)));
+  $("#env-text").textContent=d.env;
+}
+
+/* ---- jobs watcher: refresh the visible page while anything runs ---- */
+let jobPoll=null;
+function watchJobs(){
+  if(jobPoll)return;
+  jobPoll=setInterval(async()=>{
+    let running=0;try{running=(await getJSON("/api/jobs")).jobs.filter(j=>j.status==="running").length;}catch(e){}
+    $("#nav-activity-count").textContent=running?String(running):"";
+    refreshView();
+    if(!running){clearInterval(jobPoll);jobPoll=null;refreshStatus();}
+  },2500);
+}
+
+/* ---- top bar + sidebar status ---- */
+async function refreshStatus(){
+  const txt=$("#conn-txt"),bulb=$("#conn .bulb");
+  try{
+    const d=await getJSON("/api/devices");const n=d.devices.length;
+    txt.textContent=n?`${n} device${n===1?"":"s"} on adb`:"No device on adb";
+    bulb.style.background=n?"var(--ok)":"var(--pending)";$("#conn").title=d.devices.join("\n");
+  }catch(e){txt.textContent="Console offline";bulb.style.background="var(--bad)";}
+  try{
+    const d=await getJSON("/api/images");const up=(d.phones||[]).filter(p=>p.running);
+    $("#emubox").classList.toggle("on",up.length>0);
+    $("#emu-label").textContent=up.length?`Emulators: ${up.length} running`:"Emulators: none running";
+    $("#emu-note").textContent=up.length?up.map(p=>`${p.phone} (${p.state.replace("running ","")})`).join(", "):"Launch a phone from Images.";
+  }catch(e){}
+}
+
+/* ---- navigation ---- */
+const NAV=[["images","Images",loadImages],["apps","Apps",loadApps],["modules","Modules",loadModules],
+  ["skills","Skills",loadSkills],["activity","Activity",loadActivity],["settings","Settings",loadSettings]];
+let current="images";
+const nav=$("#nav");
+NAV.forEach(([id,label])=>{
+  const b=el("button",null,`<span class="dot"></span>${label}${id==="activity"?'<span class="count" id="nav-activity-count"></span>':""}`);
+  b.dataset.id=id;b.onclick=()=>select(id);nav.append(b);
+});
+function select(id){
+  const n=NAV.find(x=>x[0]===id)||NAV[0];current=n[0];
+  [...nav.children].forEach(b=>b.setAttribute("aria-current",b.dataset.id===current));
+  NAV.forEach(([v])=>$("#view-"+v).classList.toggle("panel-hidden",v!==current));
+  $("#view-title").textContent=n[1];
+  if(location.hash!=="#"+current)history.replaceState(null,"","#"+current);
+  n[2]();
+}
+function refreshView(){(NAV.find(x=>x[0]===current)||NAV[0])[2]();}
+$("#refresh").innerHTML=ICON("arrows-clockwise");$("#refresh").onclick=()=>{refreshView();refreshStatus();};
+$("#theme").innerHTML=ICON("circle-half");
+$("#theme").onclick=()=>{const r=document.documentElement;const cur=r.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");r.setAttribute("data-theme",cur==="dark"?"light":"dark");};
+
+select(location.hash.slice(1)||"images");
+refreshStatus();
+setInterval(()=>{if(!document.hidden)refreshStatus();},15000);
+getJSON("/api/jobs").then(d=>{if(d.jobs.some(j=>j.status==="running"))watchJobs();}).catch(()=>{});
+</script>

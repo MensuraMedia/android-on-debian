@@ -20,3 +20,6 @@ ponytail-debt   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba
 ponytail-gain   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-gain
 ponytail-help   | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-help
 ponytail-review | dietrichgebert/ponytail | 96608e078b2d5ea607c5c3b8b5a54d1c1fba6846 | skills/ponytail-review
+
+# Documentation diagrams (HTML/SVG, accessible). Project style: flat dark (.diagram-design marker).
+diagram-design  | cathrynlavery/diagram-design | f24d98b05e2d7a5e68c2dedfe46e5b7173f50118 | skills/diagram-design

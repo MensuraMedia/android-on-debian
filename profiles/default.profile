@@ -5,6 +5,9 @@ jdk
 shell-env
 sdk
 emulator
+rust
+devtools
+devices
 gradle
 node
 mobile-mcp
@@ -12,3 +15,4 @@ claude-permissions
 claude-rules
 skills
 app-template
+console

@@ -4,6 +4,7 @@ jdk
 shell-env
 sdk
 gradle
+devtools
 claude-permissions
 skills
 app-template

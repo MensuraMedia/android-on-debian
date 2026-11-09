@@ -15,7 +15,7 @@ adx_logfile() {
   {
     mkdir -p "$ADX_LOG_DIR" &&
     printf '%s %-5s [%s%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" \
-      "${MOD_NAME:-adx}" "${ADX_RUN_ID:+ #$ADX_RUN_ID}" "$*" >> "$ADX_LOG_DIR/adx.log"
+      "${MOD_NAME:-adx}" "${ADX_RUN_ID:+ #$ADX_RUN_ID}" "$(printf '%s' "$*" | tr '\n\r' '||')" >> "$ADX_LOG_DIR/adx.log"
   } 2>/dev/null || true
 }
 
@@ -24,7 +24,7 @@ adx_logfile() {
 adx_log_rotate() {
   local f="$1" keep="${2:-${ADX_LOG_KEEP:-5}}" i
   [ -f "$f" ] || return 0
-  [ "$(du -k "$f" | cut -f1)" -ge "${ADX_LOG_MAX_KB:-5120}" ] || return 0
+  [ "$(stat -c %s "$f")" -ge "$(( ${ADX_LOG_MAX_KB:-5120} * 1024 ))" ] || return 0
   for ((i = keep - 1; i >= 1; i--)); do
     [ -f "$f.$i" ] && mv -f "$f.$i" "$f.$((i + 1))"
   done
@@ -92,7 +92,10 @@ adx_download() {
 
 # Verify a file's SHA-256 if an expected hash is given (empty = skip).
 adx_sha256_check() {
-  [ -z "${2:-}" ] && return 0
+  if [ -z "${2:-}" ]; then
+    [ "${ADX_ALLOW_UNVERIFIED:-0}" = 1 ] && { adx_warn "no checksum for $1 (ADX_ALLOW_UNVERIFIED=1)"; return 0; }
+    adx_die "no checksum pinned for $1 (set it in config, or ADX_ALLOW_UNVERIFIED=1 to accept the risk)"
+  fi
   echo "$2  $1" | sha256sum -c --quiet - || { rm -f "$1"; adx_die "checksum mismatch for $1 (deleted; rerun to download again)"; }
 }
 

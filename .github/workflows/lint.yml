@@ -1,13 +1,32 @@
-name: lint
-on: [push, pull_request]
+# One gate, same as local: `adx check` (shell, Rust, docs, process, security).
+# Hardened: read-only token, actions pinned by commit SHA, tools installed by the
+# framework's own pinned + checksum-verified modules.
+name: check
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
 jobs:
-  shell:
+  check:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - name: bash syntax
-        run: for f in adx lib/*.sh modules/*/module.sh; do bash -n "$f"; done
-      - name: shellcheck
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck -x -s bash -S warning adx lib/*.sh modules/*/module.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0          # adx check diffs against origin/main
+          persist-credentials: false
+      - name: Install devtools (ShellCheck, cargo-deny) and Rust toolchain
+        run: ./adx devtools install && ./adx rust install
+      - name: adx check
+        env:
+          # Diff base: the commit before the push, or the PR base (empty on new branches/tags: adx falls back).
+          ADX_CHECK_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: ./adx check
+      - name: Release build and install (as adx up does)
+        run: ./adx devices install && ~/.local/bin/aodm --version && ~/.local/bin/aod-gui --version && ./adx devices status && ~/.local/bin/aodm card && ~/.local/bin/aodm health

@@ -13,6 +13,10 @@ Read `README.md`, `docs/architecture.md` and `HANDOFF.md` first.
   known limits with `shortcut: <limit>, <when to upgrade>`. Audit with
   `/ponytail-audit`, list shortcuts with `/ponytail-debt` (skills are vendored
   into apps; in this repo run `adx skills apply .` first if you want them).
+- **Diagrams:** use the `diagram-design` skill. Every diagram is **flat dark**
+  (profile `aod-flat-dark`, selected by the `.diagram-design` marker): solid
+  fills, hairlines, one mint accent, no gradients/shadows/glow, system fonts.
+  Source HTML in `docs/diagrams/`, exported SVG next to it, embedded in docs.
 - Before calling a change done, run the `adversarial-reviewer` agent on the
   segment you touched and fix or record what it finds.
 - Each capability lives in `modules/<name>/module.sh` and follows the module

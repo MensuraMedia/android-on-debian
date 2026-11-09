@@ -9,6 +9,7 @@
 #   adx <module> help                actions a module provides
 #   adx env                          versions, paths and machine facts (for docs/bug reports)
 #   adx logs [adx|emulator|dir] [-n N]  framework or emulator log (default: adx, 40 lines)
+#   adx check [--staged] [--full]    quality gate: shell, Rust, docs, process, security
 set -euo pipefail
 
 ADX_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -29,7 +30,7 @@ adx_logfile START "adx $* (cwd: $PWD)"
 trap 'adx_logfile END "exit $?"' EXIT
 
 adx_usage() {
-  sed -n '2,11p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
+  sed -n '2,12p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
 }
 
 adx_cmd_logs() {
@@ -118,11 +119,18 @@ adx_cmd_up() {
   adx_log "profile: $profile"
   local failed=""
   for m in $(sed 's/#.*//' "$file"); do
+    if [ ! -f "$ADX_ROOT/modules/$m/module.sh" ]; then
+      adx_warn "$m: no such module (typo in profiles/$profile.profile?)"; failed="$failed $m"; continue
+    fi
     if adx_run_module "$m" status >/dev/null 2>&1; then
       adx_log "$m: already ok"
     else
       adx_log "$m: installing"
-      adx_run_module "$m" install
+      # Separate process: `set -e` stays active inside the module (an `if` condition would disable it).
+      if ! "$ADX_ROOT/adx" "$m" install; then
+        adx_warn "$m: install failed (network? see above); continuing with the next module"
+        failed="$failed $m"; continue
+      fi
       if ! adx_run_module "$m" status >/dev/null 2>&1; then
         adx_warn "$m: installed but status still fails (see: adx $m status)"; failed="$failed $m"
       fi
@@ -139,5 +147,6 @@ case "${1:-}" in
   up)     shift; adx_cmd_up "$@" ;;
   env)    adx_cmd_env ;;
   logs)   shift; adx_cmd_logs "$@" ;;
+  check)  shift; . "$ADX_ROOT/lib/check.sh"; adx_cmd_check "$@" ;;
   *)      m="$1"; shift; adx_run_module "$m" "${1:-status}" "${@:2}" ;;
 esac

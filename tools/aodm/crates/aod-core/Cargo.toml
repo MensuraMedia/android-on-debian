@@ -1,0 +1,22 @@
+[package]
+name = "aod-core"
+description = "Core library of the android-on-debian phone image manager (no terminal I/O)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+jiff.workspace = true
+rustix.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

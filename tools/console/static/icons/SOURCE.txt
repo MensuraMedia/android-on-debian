@@ -1,0 +1,4 @@
+Phosphor Icons v2.0.8 (MIT, Copyright (c) 2023 Phosphor Icons), regular weight,
+copied from ~/projects/assets/Icons/phosphoricons
+(source: https://github.com/phosphor-icons/core, tag v2.0.8, tarball SHA-256
+8b4dd9afb96b50c92a613f5786af6a7dcff6e416442c42c12ed831cea050a698).
