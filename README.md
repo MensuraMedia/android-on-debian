@@ -100,6 +100,7 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 | `claude-rules` | Global rules (changelog, handoff, logging) and the `adversarial-reviewer` agent | `~/.claude/CLAUDE.md` block, `~/.claude/agents/` |
 | `skills` | Pinned design and code skills (below) | `<app>/.claude/skills/` |
 | `app-template` | Compose + Roborazzi app scaffolder | `~/projects/android-apps/<Name>` |
+| `console` | Local web console (`adx console start`): phone images, apps, modules, skills, activity, settings | menu entry; `tools/console/` (Python stdlib) |
 | `studio` | Nothing; reports on the dormant Android Studio install | `~/.local/opt/android-studio` |
 
 ## Using `adx`
@@ -133,6 +134,24 @@ Common actions:
 
 Profiles in `profiles/` choose which modules `adx up` installs.
 `render-only` skips the emulator and MCP server, for CI or low-resource machines.
+
+## Console
+
+`adx console start` opens a local web console at http://127.0.0.1:8766
+(menu: **adx console**; `adx console stop` closes it). It is Python standard
+library only, binds to 127.0.0.1, and every button runs a logged job.
+
+| Page | Shows | Buttons |
+| --- | --- | --- |
+| Images | Emulator phones (via `aodm`), phone type first; installed SDK system images | Launch, Stop, Save; Open folder |
+| Apps | Apps in `ADX_APPS_DIR` with a screenshot thumbnail (click for all) | Render (Roborazzi), Run (install + open on the emulator), Open folder |
+| Modules | `adx list` | Install (modules not ok), Run doctor |
+| Skills | `config/skills.manifest` and which apps have each skill | Links to the sources |
+| Activity | Jobs started from the console with their output; `adx.log` with a filter | |
+| Settings | Effective `config/*.env` values; `adx env` | |
+
+Actions need a same-origin request and a per-process token. Job output:
+`~/.local/state/adx/console/`; server log: `~/.local/state/adx/console.log`.
 
 ## Development workflow
 

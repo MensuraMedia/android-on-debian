@@ -82,10 +82,27 @@ mod_autoconfig() {
 
 mod_create() {
   if _emu -list-avds 2>/dev/null | grep -qx "$ADX_AVD_NAME"; then
-    adx_log "avd $ADX_AVD_NAME exists"; return 0
+    adx_log "avd $ADX_AVD_NAME exists"
+  else
+    echo no | _avdm create avd -n "$ADX_AVD_NAME" -k "$ADX_AVD_IMAGE" -d "$ADX_AVD_DEVICE"
+    adx_log "created avd $ADX_AVD_NAME"
   fi
-  echo no | _avdm create avd -n "$ADX_AVD_NAME" -k "$ADX_AVD_IMAGE" -d "$ADX_AVD_DEVICE"
-  adx_log "created avd $ADX_AVD_NAME"
+  _avd_hw_config
+}
+
+# Hardware keys avdmanager gets wrong for desktop use. hw.keyboard=no (its
+# default) makes the emulator ignore the host keyboard. Idempotent; the
+# running emulator picks the change up at its next start.
+_avd_hw_config() {
+  local cfg="${ANDROID_AVD_HOME:-$HOME/.android/avd}/$ADX_AVD_NAME.avd/config.ini"
+  if [ ! -f "$cfg" ]; then return 0; fi
+  if grep -qx "hw.keyboard=$ADX_AVD_HW_KEYBOARD" "$cfg"; then return 0; fi
+  if grep -q '^hw\.keyboard=' "$cfg"; then
+    sed -i "s/^hw\.keyboard=.*/hw.keyboard=$ADX_AVD_HW_KEYBOARD/" "$cfg"
+  else
+    echo "hw.keyboard=$ADX_AVD_HW_KEYBOARD" >> "$cfg"
+  fi
+  adx_log "set hw.keyboard=$ADX_AVD_HW_KEYBOARD in $ADX_AVD_NAME (applies from the next start)"
 }
 
 # adx emulator start [--window] [--wipe] [--notify]

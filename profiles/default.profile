@@ -15,3 +15,4 @@ claude-permissions
 claude-rules
 skills
 app-template
+console

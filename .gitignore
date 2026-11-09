@@ -10,3 +10,4 @@ config/local.env
 
 # Vendored skills: recreate with `adx skills apply .` (pinned in config/skills.manifest)
 .claude/skills/
+__pycache__/

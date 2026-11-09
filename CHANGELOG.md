@@ -86,6 +86,17 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- `console` module and `tools/console/`: a local web console (`adx console
+  start|stop|open|status`, menu entry "adx console", port `ADX_CONSOLE_PORT`,
+  default 8766), Python standard library only. Pages: Images (emulator phones
+  through `aodm`: Launch / Stop / Save; SDK system images: Open folder), Apps
+  (screenshot thumbnail and gallery; Render, Run, Open folder), Modules
+  (`adx list`, Install, Run doctor), Skills, Activity (jobs + `adx.log`) and
+  Settings (`config/*.env`, `adx env`). Same horizontal-card design and
+  Phosphor icons (MIT, `tools/console/static/icons/`) as LinSmartPhone, without
+  its LineageOS parts. Binds to 127.0.0.1; actions need same-origin + a
+  per-process token, Host header checked; every action is a job with a log in
+  `~/.local/state/adx/console/`. Added to `profiles/default.profile`.
 - Desktop window `aod-gui` (P10a, moved ahead of P5b on request), menu entry
   "Phone Images": one card per phone image with a live thumbnail of its screen
   (running phones every 4 s over adb; stopped phones show their last screen,
@@ -207,6 +218,10 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- Host keyboard did not type into the emulator: `avdmanager` creates AVDs with
+  `hw.keyboard=no`. `adx emulator create` (and `install`) now sets
+  `hw.keyboard=$ADX_AVD_HW_KEYBOARD` (default `yes`) in the AVD's `config.ini`,
+  idempotently, also on an existing AVD; it applies from the next start.
 - aodm P5a reviews (code 13, deployment 10 findings):
   - `--sandbox` could reach a real image through a sandbox `.ini` whose
     `path=` or `path.rel=` pointed outside it (a sandboxed `wipe`/`delete`
