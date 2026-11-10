@@ -86,6 +86,13 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- adx console app icon (`tools/console/static/app-icon/`, SVG source + PNG
+  16-512, `render-icons.sh`): `adx console install` puts it in the user's
+  hicolor theme as `adx-console` for the menu entry; the page favicon gives
+  Chromium's `--app` window the same icon, and the window class `adx-console`
+  matches `StartupWMClass`, so the panel and Alt+Tab show it too. The sidebar
+  badge uses the same artwork. `adx console status` reports a missing or
+  outdated icon; `adx console remove` removes only adx's icon files.
 - Console **Assets** page (`tools/console/assets.py`): your folders in
   `ADX_CONSOLE_ASSETS_DIR` (wallpapers, photos & videos, ringtones & sounds,
   APKs, screenshots) with upload (button or drag and drop; type and size

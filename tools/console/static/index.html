@@ -4,6 +4,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>adx console</title>
 <meta name="description" content="Local console for android-on-debian: phone images, apps, modules, skills.">
+<link rel="icon" type="image/svg+xml" href="/static/app-icon/adx-console.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/app-icon/32.png">
+<link rel="icon" type="image/png" sizes="256x256" href="/static/app-icon/256.png">
+<link rel="apple-touch-icon" href="/static/app-icon/256.png">
 <style>
 :root{
   --ground:#f5f6f8; --surface:#ffffff; --surface-2:#eef0f4; --ink:#1a1f27; --ink-soft:#5a6472;
@@ -39,7 +43,7 @@ a{color:var(--accent)} .mono{font-family:var(--mono)}
 .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
 .sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:4px;padding:18px 14px}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 14px}
-.brand .glyph{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-family:var(--mono);font-weight:700;font-size:15px}
+.brand .glyph{width:32px;height:32px;flex:none;display:block}
 .brand b{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:-.02em}
 .brand span{display:block;font-size:11px;color:var(--ink-soft)}
 .nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
@@ -181,7 +185,7 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
 
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="glyph">A</div><div><b>adx console</b><span>android-on-debian</span></div></div>
+    <div class="brand"><img class="glyph" src="/static/app-icon/64.png" alt=""><div><b>adx console</b><span>android-on-debian</span></div></div>
     <nav class="nav" id="nav" aria-label="Sections"></nav>
     <div class="statusbox" id="emubox">
       <div class="lamp"><span class="bulb"></span><span id="emu-label">Emulators: checking…</span></div>
