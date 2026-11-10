@@ -1,4 +1,4 @@
-MOD_DESC="Local web console (adx console start): phone images, apps, modules, skills, activity, settings"
+MOD_DESC="Local web console (adx console start): phone images, assets, apps, modules, skills, activity, settings"
 
 _server()  { echo "$ADX_ROOT/tools/console/server.py"; }
 _url()     { echo "http://127.0.0.1:$ADX_CONSOLE_PORT"; }
@@ -84,6 +84,7 @@ mod_start() {
     mkdir -p "$ADX_LOG_DIR"
     ADX_ROOT="$ADX_ROOT" ADX_APPS_DIR="$ADX_APPS_DIR" ADX_LOG_DIR="$ADX_LOG_DIR" \
       ANDROID_HOME="$ANDROID_HOME" ADX_CONSOLE_PORT="$ADX_CONSOLE_PORT" \
+      ADX_CONSOLE_ASSETS_DIR="$ADX_CONSOLE_ASSETS_DIR" ADX_CONSOLE_UPLOAD_MAX_MB="$ADX_CONSOLE_UPLOAD_MAX_MB" \
       setsid python3 "$(_server)" >>"$(_logfile)" 2>&1 < /dev/null &
     echo "$!" > "$(_pidfile)"
     for i in $(seq 1 20); do

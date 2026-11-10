@@ -21,7 +21,9 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+import assets
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -106,6 +108,26 @@ def start_job(kind, target, cmd, cwd=None):
     return job, True
 
 
+def sync_job(kind, target, fn):
+    """Run a quick action now (fn gets an assets.Log) and record it as a finished job."""
+    log = assets.Log()
+    started = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        fn(log)
+    except Exception as e:   # recorded in the job, never a 500 without a log
+        log.fail(f"{type(e).__name__}: {e}")
+    with JOBS_LOCK:
+        jid = f"{int(time.time())}-{len(JOBS) + 1}"
+        os.makedirs(JOB_DIR, exist_ok=True)
+        path = os.path.join(JOB_DIR, f"{jid}-{kind}-{re.sub(r'[^A-Za-z0-9._-]', '_', target)[:60]}.log")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(log.text() + "\n")
+        JOBS[jid] = {"id": jid, "kind": kind, "target": target, "cmd": kind, "log": path,
+                     "status": "ok" if log.ok else "failed", "exit": 0 if log.ok else 1,
+                     "started": started, "ended": time.strftime("%Y-%m-%d %H:%M:%S")}
+    return {"ok": log.ok, "job": jid, "output": log.text()[-4000:]}
+
+
 def tail(path, lines=80):
     try:
         with open(path, "rb") as fh:
@@ -156,6 +178,79 @@ def emulator_phones():
             "busy": next((k for k in ("start", "stop", "save") if busy(k, name)), ""),
         })
     return phones, (code == 0)
+
+
+def running_emulators():
+    """Running emulator phones as adb serials (the only targets of asset/feature actions)."""
+    out = []
+    for p in emulator_phones()[0]:
+        m = re.search(r":(\d+)", p["state"])
+        if p["running"] and m:
+            out.append({"serial": f"emulator-{m.group(1)}", "name": p["name"], "phone": p["phone"]})
+    return out
+
+
+def assets_view(serial):
+    phones = running_emulators()
+    serials = [p["serial"] for p in phones]
+    target = serial if serial in serials else (serials[0] if serials else None)
+    kinds = {}
+    for kind in assets.KINDS:
+        items = assets.library(kind)
+        if kind == "apps":
+            installed = assets.installed_packages(target) if target else set()
+            for i in items:
+                i["package"] = assets.apk_package(i["name"])
+                i["on_phone"] = i["package"] in installed
+        else:
+            present = assets.on_phone(target, kind) if target else set()
+            for i in items:
+                i["on_phone"] = i["name"] in present
+        kinds[kind] = items
+    return {"phones": phones, "target": target, "kinds": kinds, "dir": assets.ASSETS_DIR,
+            "locations": list(assets.LOCATIONS), "font_scales": list(assets.FONT_SCALES),
+            "max_mb": assets.UPLOAD_MAX // (1024 * 1024),
+            "ext": {k: list(v["ext"]) for k, v in assets.KINDS.items()},
+            "phone_dirs": {k: v["phone"] for k, v in assets.KINDS.items()}}
+
+
+def act_asset(kind, action, body):
+    serial = str(body.get("serial", ""))
+    if kind not in assets.KINDS:
+        return 404, {"ok": False, "reason": "unknown asset kind"}
+    if action == "delete":
+        name = str(body.get("name", ""))
+        return (200, {"ok": True}) if assets.delete_local(kind, name) else (404, {"ok": False, "reason": "no such file"})
+    if action == "open":
+        os.makedirs(assets.kind_dir(kind), exist_ok=True)
+        job, _new = start_job("open", kind, ["xdg-open", assets.kind_dir(kind)])
+        return 200, {"ok": True, "job": job["id"]}
+    if action not in ("load", "remove", "set") or (action == "set" and kind != "wallpapers"):
+        return 404, {"ok": False, "reason": "unknown action"}
+    if assets.KINDS[kind]["phone"] is None and kind != "apps":
+        return 400, {"ok": False, "reason": f"{kind} stay on this computer"}
+    if not assets.SERIAL_RE.match(serial) or serial not in {p["serial"] for p in running_emulators()}:
+        return 400, {"ok": False, "reason": "no running emulator phone with that serial"}
+    names = [i["name"] for i in assets.library(kind)] if body.get("all") else [str(body.get("name", ""))]
+    names = [n for n in names if assets.valid_file(kind, n)]
+    if not names:
+        return 404, {"ok": False, "reason": "no such file in the library"}
+
+    def fn(log):
+        for n in names:
+            if action == "set":
+                assets.set_wallpaper(log, serial, n)
+            else:
+                (assets.load if action == "load" else assets.remove)(log, serial, kind, n)
+    target = f"{serial}:{names[0] if len(names) == 1 else str(len(names)) + ' files'}"
+    return 200, sync_job(f"{action}-{kind}", target, fn)
+
+
+def act_feature(body):
+    serial, name = str(body.get("serial", "")), str(body.get("name", ""))
+    if not assets.SERIAL_RE.match(serial) or serial not in {p["serial"] for p in running_emulators()}:
+        return 400, {"ok": False, "reason": "no running emulator phone with that serial"}
+    return 200, sync_job(f"phone-{name}", serial, lambda log: assets.feature(log, serial, name, body.get("value")))
 
 
 def system_images():
@@ -375,7 +470,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = fh.read()
         except OSError:
             return self.send(404, {"error": "not found"})
-        self.send(200, data, CTYPES.get(os.path.splitext(path)[1], "application/octet-stream"))
+        ext = os.path.splitext(path)[1].lower()
+        self.send(200, data, CTYPES.get(ext) or assets.MIME.get(ext, "application/octet-stream"))
 
     def do_GET(self):
         if not self.host_ok():
@@ -409,6 +505,20 @@ class Handler(BaseHTTPRequestHandler):
         }
         if path in routes:
             return self.send(200, routes[path]())
+        q = parse_qs(urlparse(self.path).query)
+        if path == "/api/assets":
+            return self.send(200, assets_view((q.get("serial") or [""])[0]))
+        if path == "/api/phone/state":
+            serial = (q.get("serial") or [""])[0]
+            if serial not in {p["serial"] for p in running_emulators()}:
+                return self.send(400, {"ok": False, "reason": "no running emulator phone with that serial"})
+            return self.send(200, assets.phone_state(serial))
+        m = re.match(r"^/api/assets/([a-z]+)/file/([^/]+)$", path)
+        if m:
+            kind, name = m.groups()
+            if not assets.valid_file(kind, name):
+                return self.send(404, {"error": "not found"})
+            return self.file(os.path.join(assets.kind_dir(kind), name))
         m = re.match(r"^/api/apps/([^/]+)/shots$", path)
         if m and m.group(1) in app_dirs():
             return self.send(200, {"shots": app_shots(m.group(1))[1]})
@@ -419,10 +529,29 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403, {"ok": False, "reason": "missing or invalid token"})
         path = unquote(urlparse(self.path).path)
         n = int(self.headers.get("Content-Length") or 0)
+        m = re.match(r"^/api/assets/([a-z]+)/upload$", path)
+        if m:
+            if n > assets.UPLOAD_MAX:
+                return self.send(413, {"ok": False, "reason": f"larger than {assets.UPLOAD_MAX // (1024 * 1024)} MB"})
+            data = self.rfile.read(n) if n else b""
+            name = (parse_qs(urlparse(self.path).query).get("name") or [""])[0]
+            ok, msg, stored = assets.save_upload(m.group(1), name, data)
+            return self.send(200 if ok else 400, {"ok": ok, "reason": msg, "name": stored})
+        if n > 64 * 1024:
+            return self.send(413, {"ok": False, "reason": "request too large"})
         try:
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
         except ValueError:
             body = {}
+        if not isinstance(body, dict):
+            body = {}
+        m = re.match(r"^/api/assets/([a-z]+)/([a-z]+)$", path)
+        if m:
+            code, res = act_asset(m.group(1), m.group(2), body)
+            return self.send(code, res)
+        if path == "/api/phone/feature":
+            code, res = act_feature(body)
+            return self.send(code, res)
         m = re.match(r"^/api/(images|apps|modules)/([^/]+)/([a-z]+)$", path)
         if m and NAME_RE.match(m.group(2)):
             kind, name, action = m.groups()

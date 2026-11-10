@@ -130,6 +130,52 @@ pre.log{margin:0;background:var(--surface-2);border:1px solid var(--border);bord
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;padding:16px}
 .gallery figure{margin:0} .gallery img{width:100%;border:1px solid var(--border);border-radius:10px;display:block}
 .gallery figcaption{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:5px;word-break:break-all}
+/* Assets page */
+.target{display:flex;align-items:center;gap:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);margin-bottom:20px}
+.target .handset{flex:none;width:26px;height:46px}
+.target .t{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.target select,.feat select,.feat input[type=text]{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--ink)}
+.feats{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-bottom:26px}
+.feat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow)}
+.feat .fh{display:flex;align-items:center;gap:10px}
+.feat .fh .num{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-left:auto}
+.feat .fh>.ico{width:20px;height:20px;color:var(--accent)}
+.feat h3{font-size:14px}
+.feat p{margin:0;font-size:12px;color:var(--ink-soft)}
+.feat .ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:auto}
+.feat .ctl label{font-size:12px;color:var(--ink-soft);display:inline-flex;gap:6px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:var(--surface);color:var(--ink-soft);font:inherit;font-size:12px;font-weight:600;padding:6px 11px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.seg button+button{border-left:1px solid var(--border-strong)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+.lib{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);margin-bottom:16px}
+.lib.drag{outline:2px dashed var(--accent);outline-offset:-6px}
+.lib .lh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)}
+.lib .lh h2{font-size:14px} .lib .lh>.ico{width:18px;height:18px;color:var(--accent)}
+.lib .lh .path{font-family:var(--mono);font-size:11px;color:var(--ink-soft);width:100%}
+.lib .lh .sp{flex:1}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;padding:16px}
+.tile{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-2);display:flex;flex-direction:column}
+.tile .img{aspect-ratio:9/16;background:var(--surface-2) center/cover no-repeat;position:relative;display:grid;place-items:center;color:var(--ink-soft)}
+.tile .img .ico{width:34px;height:34px}
+.tile .img .tag{position:absolute;top:6px;left:6px}
+.tile .meta{padding:8px;font-size:11.5px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.tile .meta .nm{font-family:var(--mono);font-size:11px;word-break:break-all}
+.tile .meta .row{display:flex;gap:5px;flex-wrap:wrap}
+.tile .btn,.rowitem .btn{padding:5px 8px;font-size:11.5px}
+.tile .iconbtn{width:28px;height:28px;margin-left:auto}
+.feat input[type=range]{accent-color:var(--accent);flex:1;min-width:120px}
+.sec-hd .n{overflow-wrap:anywhere;text-align:right}
+.rows{padding:8px 16px 16px}
+.rowitem{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.rowitem:last-child{border-bottom:0}
+.rowitem .nm{font-family:var(--mono);font-size:12px;word-break:break-all}
+.rowitem small{display:block;color:var(--ink-soft);font-size:11px}
+.rowitem audio{height:30px;max-width:220px}
+.drop-hint{padding:16px;color:var(--ink-soft);font-size:12.5px}
+.toast{position:fixed;right:18px;bottom:18px;max-width:440px;background:var(--surface);border:1px solid var(--border-strong);border-left:4px solid var(--ok);border-radius:10px;box-shadow:var(--shadow);padding:11px 14px;font-size:12.5px;z-index:60}
+.toast.bad{border-left-color:var(--bad)} .toast pre{margin:6px 0 0;font-family:var(--mono);font-size:11px;white-space:pre-wrap;color:var(--ink-soft);max-height:120px;overflow:auto}
 footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px solid var(--border);margin-top:auto}
 </style>
 
@@ -155,6 +201,11 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
     <section class="wrap" id="view-images">
       <p class="mini">Emulator phones (AVDs, managed by <span class="mono">aodm</span>) and the Android system images they boot from. Launch opens the phone in a window; Save makes a full copy of a stopped phone.</p>
       <div id="images-body"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="wrap panel-hidden" id="view-assets">
+      <p class="mini">Resources you can load into the running emulator phone right away, and take out again. Upload your own files into each folder (button or drag and drop); they stay in your library on this computer until you delete them.</p>
+      <div id="assets-body"><div class="empty">Loading…</div></div>
     </section>
 
     <section class="wrap panel-hidden" id="view-apps">
@@ -220,7 +271,7 @@ async function post(url,body){
   if(!TOKEN)TOKEN=(await getJSON("/api/token")).token;
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","X-Adx-Token":TOKEN},body:JSON.stringify(body||{})});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok||d.ok===false)throw new Error(d.reason||("HTTP "+r.status));
+  if(!r.ok||d.ok===false)throw new Error(d.reason||(d.output||"").split("\n").filter(Boolean).pop()||("HTTP "+r.status));
   return d;
 }
 function button(icon,label,cls,onclick,disabled,title){
@@ -276,6 +327,188 @@ async function loadImages(){
     small:s.used_by.join(", "),
     acts:[button("folder-open","Open folder","",()=>post("/api/system-images/open",{path:s.path}))]}));
   body.append(section("System images",sys.length,"image",sys,"No system images installed: adx emulator install adds the one in config/defaults.env."));
+}
+
+/* ---- Assets: target phone, top 10 features, libraries ---- */
+let ASSETS=null,TARGET=null;
+const KIND_META={
+  wallpapers:{title:"Wallpapers",icon:"image-square",tile:true},
+  media:{title:"Photos & videos",icon:"film-strip",tile:true},
+  sounds:{title:"Ringtones & sounds",icon:"music-notes",tile:false},
+  apps:{title:"Apps (APK)",icon:"package",tile:false},
+  screenshots:{title:"Screenshots",icon:"camera",tile:true},
+};
+function toast(msg,ok,detail){
+  document.querySelectorAll(".toast").forEach(t=>t.remove());
+  const t=el("div","toast"+(ok?"":" bad"),`${esc(msg)}${detail?`<pre>${esc(detail)}</pre>`:""}`);
+  document.body.append(t);setTimeout(()=>t.remove(),ok?3500:9000);
+}
+/* run a phone/asset action, then re-render; errors become a toast, never an alert */
+async function act(label,url,body){
+  try{const d=await post(url,{serial:TARGET,...(body||{})});
+    toast(`${label}: done`,true,(d.output||"").split("\n").filter(l=>!l.startsWith("$ ")).slice(-2).join("\n"));}
+  catch(e){toast(`${label}: failed`,false,e.message+"\nFull output: Activity");}
+  loadAssets();
+}
+function actBtn(icon,label,cls,run,disabled,title){
+  const b=el("button","btn"+(cls?" "+cls:""),ICONTXT(icon,label));b.disabled=!!disabled;if(title)b.title=title;
+  b.onclick=async()=>{b.disabled=true;b.innerHTML=ICONTXT("circle-notch",label,true);await run();};
+  return b;
+}
+function seg(opts,current,onpick,disabled){
+  const g=el("div","seg");
+  opts.forEach(([v,label,icon])=>{const b=el("button","",icon?ICONTXT(icon,label):esc(label));
+    b.setAttribute("aria-pressed",String(v)===String(current));b.disabled=!!disabled;
+    b.onclick=()=>{if(String(v)!==String(current))onpick(v);};g.append(b);});
+  return g;
+}
+function feat(n,icon,title,desc,controls){
+  const f=el("div","feat");
+  f.append(el("div","fh",`${ICON(icon)}<h3>${esc(title)}</h3><span class="num">${String(n).padStart(2,"0")}</span>`));
+  f.append(el("p","",desc));
+  const c=el("div","ctl");controls.forEach(x=>c.append(x));f.append(c);return f;
+}
+function libCounts(kind){const items=(ASSETS.kinds[kind]||[]);return [items.length,items.filter(i=>i.on_phone).length];}
+async function loadAssets(){
+  const body=$("#assets-body");
+  let d;try{d=await getJSON("/api/assets"+(TARGET?`?serial=${encodeURIComponent(TARGET)}`:""));}
+  catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
+  ASSETS=d;TARGET=d.target;
+  let st={};if(TARGET){try{st=await getJSON(`/api/phone/state?serial=${encodeURIComponent(TARGET)}`);}catch(e){}}
+  const off=!TARGET;
+  body.innerHTML="";
+  /* target phone */
+  const tb=el("div","target");tb.append(el("div","handset"));
+  if(off){
+    tb.append(el("div","",'<div class="t">No phone running</div><div style="font-size:12.5px;color:var(--ink-soft)">Launch an emulator phone to load assets and use the features below.</div>'));
+    const go=el("button","btn primary",ICONTXT("play","Go to Images"));go.style.marginLeft="auto";go.onclick=()=>select("images");tb.append(go);
+  }else{
+    const p=d.phones.find(x=>x.serial===TARGET);
+    tb.append(el("div","",`<div class="t">${esc(p.phone)}</div><div class="mono" style="font-size:12px;color:var(--ink-soft)">${esc(p.name)} · ${esc(p.serial)} · loading here</div>`));
+    if(d.phones.length>1){const sel=el("select");sel.style.marginLeft="auto";sel.setAttribute("aria-label","Target phone");
+      d.phones.forEach(x=>sel.append(new Option(`${x.phone} (${x.serial})`,x.serial,false,x.serial===TARGET)));
+      sel.onchange=()=>{TARGET=sel.value;loadAssets();};tb.append(sel);}
+    else{const t=el("span","tag ok","running");t.style.marginLeft="auto";tb.append(t);}
+  }
+  body.append(tb);
+
+  /* top 10 features */
+  body.append(el("div","sec-hd",'<h2>Top 10 features for the running phone</h2><span class="n">changes apply immediately</span>'));
+  const fs=el("div","feats");
+  const libFeat=(n,kind,desc,loadLabel,removeLabel)=>{const [all,on]=libCounts(kind);const m=KIND_META[kind];
+    return feat(n,m.icon,m.title,`${desc} <b style="color:var(--ink)">${on}/${all}</b> on the phone.`,[
+      actBtn("download-simple",loadLabel,"primary",()=>act(`${loadLabel} (${m.title})`,`/api/assets/${kind}/load`,{all:true}),off||!all),
+      actBtn("x-circle",removeLabel,"",()=>act(`${removeLabel} (${m.title})`,`/api/assets/${kind}/remove`,{all:true}),off||!on),
+      (()=>{const b=el("button","btn",ICONTXT("folder-open","Folder"));b.onclick=()=>$(`#lib-${kind}`).scrollIntoView({behavior:"smooth"});return b;})()]);};
+  fs.append(libFeat(1,"wallpapers","Your wallpaper folder; load images, then set one on the phone.","Load all","Remove all"));
+  fs.append(libFeat(2,"media","Pictures and videos for the Photos app (DCIM/adx).","Load all","Remove all"));
+  fs.append(libFeat(3,"sounds","Shown in the ringtone, notification and alarm pickers.","Load all","Remove all"));
+  fs.append(libFeat(4,"apps","APK files to install for testing.","Install all","Uninstall all"));
+  /* 5 location */
+  const locSel=el("select");locSel.setAttribute("aria-label","Location preset");
+  locSel.append(new Option("Choose a city…",""));(d.locations||[]).forEach(c=>locSel.append(new Option(c,c)));
+  const locIn=el("input");locIn.type="text";locIn.placeholder="lat, lon";locIn.size=14;locIn.setAttribute("aria-label","Latitude, longitude");
+  locSel.disabled=locIn.disabled=off;
+  fs.append(feat(5,"map-pin","Location","Set the phone's GPS position (for maps and weather apps).",[locSel,locIn,
+    actBtn("map-pin","Set","primary",()=>{const v=locIn.value.trim()||locSel.value;if(!v){toast("Location: choose a city or type lat, lon",false);loadAssets();return;}
+      return act(`Location ${v}`,"/api/phone/feature",{name:"location",value:v});},off)]));
+  /* 6 dark mode */
+  fs.append(feat(6,"moon","Dark mode","System-wide light or dark theme.",[
+    seg([["no","Light","sun"],["yes","Dark","moon"]],st.dark,v=>act(`Dark mode ${v}`,"/api/phone/feature",{name:"dark",value:v}),off)]));
+  /* 7 battery */
+  const rng=el("input");rng.type="range";rng.min=0;rng.max=100;rng.step=5;rng.value=st.battery_level??100;rng.disabled=off;rng.setAttribute("aria-label","Battery level");
+  const lv=el("b","",`${rng.value}%`);rng.oninput=()=>lv.textContent=rng.value+"%";
+  rng.onchange=()=>act(`Battery ${rng.value}%`,"/api/phone/feature",{name:"battery_level",value:rng.value});
+  fs.append(feat(7,"battery-medium","Battery","Simulate a battery level and charging, e.g. to test low-battery behaviour.",[rng,lv,
+    seg([["on","Charging"],["off","On battery"]],st.charging,v=>act(`Charging ${v}`,"/api/phone/feature",{name:"charging",value:v}),off)]));
+  /* 8 connectivity */
+  const net=(key,label,icon)=>{const w=el("label","",`${ICON(icon)}${label}`);
+    w.append(seg([["on","On"],["off","Off"]],st[key],v=>act(`${label} ${v}`,"/api/phone/feature",{name:key,value:v}),off));return w;};
+  fs.append(feat(8,"airplane","Connectivity","Test offline and flaky-network behaviour.",[net("airplane","Airplane","airplane"),net("wifi","Wi-Fi","wifi-high"),net("data","Mobile data","cell-signal-full")]));
+  /* 9 display */
+  const fsSel=el("select");fsSel.setAttribute("aria-label","Font scale");fsSel.disabled=off;
+  (d.font_scales||[]).forEach(v=>fsSel.append(new Option(`Text ${Math.round(parseFloat(v)*100)}%`,v,false,parseFloat(v)===parseFloat(st.font_scale||"1"))));
+  fsSel.onchange=()=>act(`Text size ${fsSel.value}`,"/api/phone/feature",{name:"font_scale",value:fsSel.value});
+  const anim=el("label","","Animations");anim.append(seg([["on","On"],["off","Off"]],st.animations,v=>act(`Animations ${v}`,"/api/phone/feature",{name:"animations",value:v}),off));
+  const tch=el("label","",`${ICON("hand-pointing")}Show taps`);tch.append(seg([["on","On"],["off","Off"]],st.touches,v=>act(`Show taps ${v}`,"/api/phone/feature",{name:"touches",value:v}),off));
+  fs.append(feat(9,"text-aa","Display & touch","Large text for accessibility checks, animations off for steady tests, taps shown for recordings.",[fsSel,anim,tch]));
+  /* 10 clean status bar + screenshot */
+  fs.append(feat(10,"sparkle","Clean status bar & screenshot","Demo mode: 12:00, full battery and signal, no notifications. Then capture the screen to Screenshots.",[
+    seg([["on","Clean"],["off","Normal"]],st.demo,v=>act(`Clean status bar ${v}`,"/api/phone/feature",{name:"demo",value:v}),off),
+    actBtn("camera","Screenshot","primary",()=>act("Screenshot","/api/phone/feature",{name:"screenshot",value:""}),off)]));
+  body.append(fs);
+
+  /* libraries (the folders) */
+  body.append(el("div","sec-hd",`<h2>Your folders</h2><span class="n mono">${esc(d.dir)}</span>`));
+  Object.keys(KIND_META).forEach(kind=>body.append(libSection(kind,d,off)));
+}
+async function uploadFiles(kind,files){
+  const ext=ASSETS.ext[kind];let ok=0,bad=[];
+  if(!TOKEN)TOKEN=(await getJSON("/api/token")).token;
+  for(const f of files){
+    if(!ext.some(e=>f.name.toLowerCase().endsWith(e))){bad.push(`${f.name}: not ${ext.join(" ")}`);continue;}
+    if(f.size>ASSETS.max_mb*1024*1024){bad.push(`${f.name}: larger than ${ASSETS.max_mb} MB`);continue;}
+    toast(`Uploading ${f.name}…`,true);
+    const r=await fetch(`/api/assets/${kind}/upload?name=${encodeURIComponent(f.name)}`,{method:"POST",headers:{"X-Adx-Token":TOKEN,"Content-Type":"application/octet-stream"},body:f});
+    const j=await r.json().catch(()=>({}));if(r.ok&&j.ok)ok++;else bad.push(`${f.name}: ${j.reason||r.status}`);
+  }
+  toast(`${ok} file${ok===1?"":"s"} added to ${KIND_META[kind].title}`,!bad.length,bad.join("\n"));
+  loadAssets();
+}
+function libSection(kind,d,off){
+  const m=KIND_META[kind],items=d.kinds[kind]||[],on=items.filter(i=>i.on_phone).length;
+  const sec=el("section","lib");sec.id=`lib-${kind}`;
+  const hd=el("div","lh",`${ICON(m.icon)}<h2>${esc(m.title)}</h2><span class="tag off">${items.length} file${items.length===1?"":"s"}</span>${kind!=="screenshots"?`<span class="tag ${on?"ok":"off"}">${on} on phone</span>`:""}<span class="sp"></span>`);
+  if(kind!=="screenshots"){
+    const inp=el("input");inp.type="file";inp.multiple=true;inp.accept=d.ext[kind].join(",");inp.hidden=true;
+    inp.onchange=()=>{if(inp.files.length)uploadFiles(kind,[...inp.files]);};
+    const up=el("button","btn primary",ICONTXT("upload-simple","Upload"));up.onclick=()=>inp.click();hd.append(inp,up);
+    /* drag and drop onto the folder */
+    sec.ondragover=e=>{e.preventDefault();sec.classList.add("drag");};
+    sec.ondragleave=()=>sec.classList.remove("drag");
+    sec.ondrop=e=>{e.preventDefault();sec.classList.remove("drag");if(e.dataTransfer.files.length)uploadFiles(kind,[...e.dataTransfer.files]);};
+  }
+  hd.append(actBtn("folder-open","Open folder","",async()=>{try{await post(`/api/assets/${kind}/open`);}catch(e){toast("Open folder: failed",false,e.message);}loadAssets();}));
+  const where=d.phone_dirs[kind]?`on the phone: /sdcard/${d.phone_dirs[kind].join(", /sdcard/")}`:kind==="apps"?"installed with adb install":"kept on this computer";
+  hd.append(el("div","path",`${esc(d.dir)}/${kind} · ${esc(where)}`));
+  sec.append(hd);
+  if(!items.length){sec.append(el("div","drop-hint",kind==="screenshots"?"No screenshots yet: use Screenshot in feature 10.":`Empty. Upload ${d.ext[kind].join(" ")} files, or drop them here.`));return sec;}
+  const enc=n=>encodeURIComponent(n),file=i=>`/api/assets/${kind}/file/${enc(i.name)}`;
+  const del=(i,compact)=>{
+    const run=async()=>{if(!confirm(`Delete ${i.name} from your library?${i.on_phone?" (It stays on the phone until you remove it.)":""}`)){loadAssets();return;}
+      try{await post(`/api/assets/${kind}/delete`,{name:i.name});toast(`Deleted ${i.name}`,true);}catch(e){toast("Delete failed",false,e.message);}loadAssets();};
+    const title="Delete from your library on this computer";
+    if(!compact)return actBtn("trash","Delete","",run,false,title);
+    const b=el("button","iconbtn",ICON("trash"));b.title=title;b.setAttribute("aria-label",`Delete ${i.name}`);
+    b.onclick=async()=>{b.disabled=true;b.innerHTML=ICON("circle-notch",true);await run();};
+    return b;};
+  const loadRm=i=>i.on_phone
+    ?actBtn("x-circle",kind==="apps"?"Uninstall":"Remove","",()=>act(`${kind==="apps"?"Uninstall":"Remove"} ${i.name}`,`/api/assets/${kind}/remove`,{name:i.name}),off,"Take it off the phone")
+    :actBtn("download-simple",kind==="apps"?"Install":"Load","primary",()=>act(`${kind==="apps"?"Install":"Load"} ${i.name}`,`/api/assets/${kind}/load`,{name:i.name}),off,"Put it on the phone");
+  if(m.tile){
+    const g=el("div","tiles");
+    items.forEach(i=>{
+      const t=el("div","tile");const img=el("div","img");
+      if(i.mime.startsWith("image/"))img.style.backgroundImage=`url("${file(i)}")`;else img.innerHTML=ICON("film-strip");
+      if(i.on_phone)img.append(el("span","tag ok","on phone"));
+      t.append(img);
+      const meta=el("div","meta",`<span class="nm">${esc(i.name)}</span>`);const row=el("div","row");
+      if(kind!=="screenshots")row.append(loadRm(i));
+      if(kind==="wallpapers")row.append(actBtn("paint-brush","Set","",()=>act(`Set wallpaper ${i.name}`,"/api/assets/wallpapers/set",{name:i.name}),off,"Open the phone's set-wallpaper screen with this image (confirm on the phone)"));
+      if(kind==="screenshots"){const a=el("a","btn",ICONTXT("arrow-square-out","View"));a.href=file(i);a.target="_blank";a.rel="noopener";row.append(a);}
+      row.append(del(i,true));meta.append(row);t.append(meta);g.append(t);
+    });
+    sec.append(g);
+  }else{
+    const rows=el("div","rows");
+    items.forEach(i=>{
+      const r=el("div","rowitem",`<div><span class="nm">${esc(i.name)}</span><small>${kind==="apps"?esc(i.package||"package unreadable"):""} ${(i.size/1048576).toFixed(1)} MB${i.on_phone?' · <span class="tag ok">'+(kind==="apps"?"installed":"on phone")+'</span>':""}</small></div>`);
+      if(kind==="sounds"){const a=el("audio");a.controls=true;a.preload="none";a.src=file(i);r.append(a);}else r.append(el("span"));
+      const row=el("div","acts");row.style.marginTop="0";row.append(loadRm(i),del(i));r.append(row);rows.append(r);
+    });
+    sec.append(rows);
+  }
+  return sec;
 }
 
 /* ---- Apps ---- */
@@ -405,7 +638,7 @@ async function refreshStatus(){
 }
 
 /* ---- navigation ---- */
-const NAV=[["images","Images",loadImages],["apps","Apps",loadApps],["modules","Modules",loadModules],
+const NAV=[["images","Images",loadImages],["assets","Assets",loadAssets],["apps","Apps",loadApps],["modules","Modules",loadModules],
   ["skills","Skills",loadSkills],["activity","Activity",loadActivity],["settings","Settings",loadSettings]];
 let current="images";
 const nav=$("#nav");

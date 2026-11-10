@@ -86,6 +86,18 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- Console **Assets** page (`tools/console/assets.py`): your folders in
+  `ADX_CONSOLE_ASSETS_DIR` (wallpapers, photos & videos, ringtones & sounds,
+  APKs, screenshots) with upload (button or drag and drop; type and size
+  checked, `ADX_CONSOLE_UPLOAD_MAX_MB`), and the top 10 features for the
+  running emulator phone: 1 wallpapers (load, remove, Set opens the phone's
+  set-wallpaper preview), 2 photos & videos (`DCIM/adx`), 3 ringtones & sounds
+  (`Ringtones|Notifications|Alarms/adx`), 4 APK install/uninstall, 5 location
+  (10 cities or lat, lon), 6 dark mode, 7 battery level and charging, 8
+  airplane / Wi-Fi / mobile data, 9 text size, animations, show taps, 10 clean
+  status bar (demo mode) and screenshot. Only emulators aodm reports as running
+  are targets; removal only deletes the console's own `adx` folders on the
+  phone; each action is recorded as a job.
 - `console` module and `tools/console/`: a local web console (`adx console
   start|stop|open|status`, menu entry "adx console", port `ADX_CONSOLE_PORT`,
   default 8766), Python standard library only. Pages: Images (emulator phones
