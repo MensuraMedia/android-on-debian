@@ -364,7 +364,11 @@ pub fn clone(ctx: &Ctx, src: &Image, name: &str) -> Result<String> {
     let t0 = Instant::now();
     install(ctx, &src.dir, name, &target, false)?;
     Registry::update(&cfg_dir(ctx.env, "ADX_AOD_HOME")?, |r| {
-        r.images.entry(name.to_string()).or_default().origin = Some(src.name.clone());
+        // A copy of an offline phone stays offline (never opened up by a clone).
+        let offline = r.offline(&src.name);
+        let e = r.images.entry(name.to_string()).or_default();
+        e.origin = Some(src.name.clone());
+        e.offline = offline;
     })?;
     let msg = format!(
         "cloned from {} in {:.0} s (first boot is cold; same Android ID as {} until identity policies, P5)",
@@ -602,7 +606,14 @@ mod tests {
         let e = lock("a", d.path()).err().unwrap();
         assert!(e.to_string().contains("aodm stop a"), "{e}");
         drop(held);
-        assert!(lock("a", d.path()).is_ok());
+        // Another test forking at this moment shares the lock until its child execs.
+        let free = (0..50).any(|_| {
+            lock("a", d.path()).is_ok() || {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                false
+            }
+        });
+        assert!(free);
     }
 
     #[test]

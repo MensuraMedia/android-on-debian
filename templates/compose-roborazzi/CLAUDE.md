@@ -18,6 +18,30 @@ emulator through mobile-mcp only when needed.
 | Crash logs | `adb logcat -d *:E` |
 | Several emulators running | `export ANDROID_SERIAL=emulator-5554` first (serials: `aodm health`), else plain `adb` fails |
 
+## Pipeline: check, test and deploy
+
+The environment builds, checks, tests and deploys the app for you. After every
+change, run it and read the result:
+
+```sh
+adx pipeline run @@APP_NAME@@      # build, lint, unit + screenshot tests, install on the phone, smoke-test the launch
+adx pipeline last @@APP_NAME@@     # the latest result again (add --json for run.json)
+```
+
+- Stages: `build` (assembleDebug), `check` (lintDebug; errors fail it),
+  `test` (verifyRoborazziDebug, or recordRoborazziDebug while there are no
+  references), `deploy` (install on the running phone; several running: pass
+  `--serial emulator-NNNN`; none: it starts one), `smoke` (launch, still
+  running after a few seconds, no crash or ANR in logcat).
+- On failure the summary names the stage, the compiler or lint errors, the
+  failing tests, or the crash stack. The run folder (printed as `folder`)
+  holds `<stage>.log`, `lint.xml`, `diff-*.png` (screenshot changes: look at
+  them; if the change is intended, re-record with
+  `./gradlew recordRoborazziDebug`), `screen.png` (the phone after launch)
+  and `logcat.txt`.
+- Only some stages: `--stages build,test`. The owner sees the same runs on
+  the console's Apps page.
+
 ## UI workflow
 
 1. Edit composables under `app/src/main/kotlin/`.

@@ -6,3 +6,6 @@ local.properties
 .kotlin/
 captures/
 .claude/settings.local.json
+# Roborazzi diff output next to the committed references
+app/src/test/screenshots/*_compare.png
+app/src/test/screenshots/*_actual.png

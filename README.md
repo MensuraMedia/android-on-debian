@@ -112,7 +112,7 @@ adx up [profile]                 install every module in a profile (default: def
 adx <module> [action] [args...]  run one module action (default: status)
 adx <module> help                list a module's actions
 adx env                          versions, paths and machine facts
-adx logs [adx|emulator|dir] [-n N]  framework / emulator logs (~/.local/state/adx/)
+adx logs [adx|emulator|logcat|dir] [-n N]  framework / emulator / phone logcat logs (~/.local/state/adx/)
 ```
 
 Common actions:
@@ -120,6 +120,7 @@ Common actions:
 | Command | Effect |
 | --- | --- |
 | `adx app-template new <Name> <package> [dir]` | Scaffold an app (permissions, skills, wrapper, git init) |
+| `adx pipeline run <App> [--serial S] [--stages …]` | Build, lint, test (unit + screenshots), install on the running phone, smoke-test the launch; `last` / `list` read the results |
 | `adx emulator start [--window] [--wipe]` / `stop` | Boot or stop the AVD (headless unless `--window`; `--wipe` factory-resets its data; reattaches adb if it lost a running emulator) |
 | `adx emulator status` | Process, adb state, GPU mode, crash and hybrid-GPU hints, menu entry |
 | `adx emulator autoconfig` | Detect hybrid GPUs and write safe emulator settings to `config/local.env` |
@@ -137,27 +138,53 @@ Profiles in `profiles/` choose which modules `adx up` installs.
 
 ## Console
 
-`adx console start` opens a local web console at http://127.0.0.1:8766
+`adx console start` opens a local web console at http://127.0.0.2:8766
 (menu: **adx console**; `adx console stop` closes it). It is Python standard
-library only, binds to 127.0.0.1, and every button runs a logged job.
+library only, binds to 127.0.0.2 (loopback that the emulator phones can't
+reach; `ADX_CONSOLE_HOST`), and every button runs a logged job. It needs no
+internet: its window is cut off from everything but the console itself.
 
 | Page | Shows | Buttons |
 | --- | --- | --- |
-| Images | Emulator phones (via `aodm`), phone type first, specs in a grid; installed SDK system images | Launch / Stop, Save, Duplicate, Rename; Screenshot, Record, Captures (per phone); Open folder |
+| Images | Emulator phones (via `aodm`), phone type first, specs in a grid; installed SDK system images | Launch / Stop, Save, Duplicate, Rename, Go offline / Go online; Screenshot, Record, Captures, Logcat (per phone); Open folder |
 | Assets | Your folders (wallpapers, photos & videos, ringtones & sounds, APKs) and per-phone captures in `ADX_CONSOLE_ASSETS_DIR`, and the top 10 features for the running phone | Upload (or drag and drop), Load / Remove per file or all, Set wallpaper, Install / Uninstall, Delete; location, dark mode, battery, connectivity, display & touch, clean status bar, screenshot |
-| Apps | Apps in `ADX_APPS_DIR` with a screenshot thumbnail (click for all) | Render (Roborazzi), Run (install + open on the emulator), Open folder |
+| Apps | Apps in `ADX_APPS_DIR` with the last pipeline run (stage by stage, the phone's screen after launch); the pipeline skills new apps get | New app, Run pipeline (asks which phone if several run), Runs (history: stages, logs, screen, screenshot diffs), Record screenshots, Open folder |
 | Modules | `adx list` | Install (modules not ok), Run doctor |
-| Skills | `config/skills.manifest` and which apps have each skill | Links to the sources |
 | Activity | Jobs started from the console with their output; `adx.log` with a filter | |
 | Settings | Effective `config/*.env` values; `adx env` | |
 
 Actions need a same-origin request and a per-process token. Job output:
 `~/.local/state/adx/console/`; server log: `~/.local/state/adx/console.log`.
 The sidebar's **Internet** switch cuts the running phones off the internet
-(airplane mode). Security posture and controls: [docs/security.md](docs/security.md).
+(airplane mode, inside the phone). **Go offline** on a phone's card instead
+starts that phone with no network at all, set outside the phone (`aodm net
+NAME offline`; it applies at the next start, and the card offers a restart).
+Every start saves the phone's logcat to `~/.local/state/adx/logcat-NAME.log`
+(the previous starts as `.1`…): **Logcat** on the card, `adx logs logcat`,
+or `aodm logs --image NAME --logcat`; filter with e.g.
+`grep -E ' [EW] ' ~/.local/state/adx/logcat-NAME.log`.
+Security posture and controls: [docs/security.md](docs/security.md).
+What app development and release need (machine, project, pipeline, signing,
+store requirements): [docs/app-development-and-release.md](docs/app-development-and-release.md).
 
 ## Development workflow
 
+The environment is built for Claude, not as an IDE: you plan, design and
+develop with Claude Code; the environment assembles, checks, tests and
+deploys the app to the emulator, and you both review it there and iterate.
+
+0. **Pipeline (every change).** `adx pipeline run <App>`: `build`
+   (assembleDebug) → `check` (lint; errors fail) → `test` (unit tests and the
+   Roborazzi screenshot comparison; the first run records the references) →
+   `deploy` (install on the running phone, or start `ADX_PIPELINE_IMAGE`) →
+   `smoke` (launch; still running after `ADX_PIPELINE_SMOKE_SECS` s, no crash
+   or ANR). It stops at the first failure. Each run is a folder in
+   `ADX_PIPELINE_DIR/<App>/<run-id>/` with `run.json` (progress after each
+   stage), `summary.md`, one log per stage and the evidence (`lint.xml`,
+   `diff-*.png`, `screen.png`, `logcat.txt`); the last `ADX_PIPELINE_KEEP`
+   runs are kept. Claude reads the summary and fixes; you see the same runs
+   on the console's Apps page. Runner log: `~/.local/state/adx/pipeline.log`
+   (`grep -E 'WARN|ERROR' ~/.local/state/adx/pipeline.log`).
 1. **Render loop (seconds, no device).** Claude edits composables, runs
    `./gradlew recordRoborazziDebug` and reads the PNGs. Each screen and state
    is a `@Test` calling `captureRoboImage(...)`.

@@ -18,6 +18,12 @@ mod_new() {
   local dest="${3:-$ADX_APPS_DIR/$name}" tpl="${4:-compose-roborazzi}"
   [[ "$name" =~ ^[A-Za-z][A-Za-z0-9]*$ ]] || adx_die "AppName must be alphanumeric, starting with a letter"
   [[ "$pkg" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]] || adx_die "invalid package '$pkg'"
+  local seg kw=" abstract as assert boolean break byte case catch char class const continue default do double else enum extends false final finally float for fun goto if implements import in instanceof int interface is long native new null object package private protected public return short static strictfp super switch synchronized this throw throws transient true try typealias typeof val var void volatile when while "
+  for seg in ${pkg//./ }; do   # Java/Kotlin keywords break the generated sources
+    case "$kw" in
+      *" $seg "*) adx_die "package segment '$seg' is a Java/Kotlin keyword" ;;
+    esac
+  done
   [ -d "$ADX_ROOT/templates/$tpl" ] || adx_die "no template '$tpl'"
   [ -e "$dest" ] && adx_die "$dest already exists"
 

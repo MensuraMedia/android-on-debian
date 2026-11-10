@@ -31,6 +31,8 @@ pub struct ImageRow {
     /// Number of saves, e.g. `3 (1 pinned)`; `-` for none.
     pub saves: String,
     pub groups: String,
+    /// Starts without a network (registry `offline`); JSON only.
+    pub offline: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -298,6 +300,7 @@ pub fn image_rows(env: &Env, images: &[Image], procs: &[EmuProc], reg: &Registry
                 }
             },
             groups: reg.groups(&i.name).join(","),
+            offline: reg.offline(&i.name),
         })
         .collect()
 }
@@ -419,6 +422,7 @@ mod tests {
                 size: "6.4G".into(),
                 saves: "-".into(),
                 groups: String::new(),
+                offline: false,
             }],
         }
     }

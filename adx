@@ -8,7 +8,7 @@
 #   adx <module> [action] [args...]  run one module action (default action: status)
 #   adx <module> help                actions a module provides
 #   adx env                          versions, paths and machine facts (for docs/bug reports)
-#   adx logs [adx|emulator|dir] [-n N]  framework or emulator log (default: adx, 40 lines)
+#   adx logs [adx|emulator|logcat|dir] [-n N]  framework, emulator or phone (logcat) log (default: adx, 40 lines)
 #   adx check [--staged] [--full]    quality gate: shell, Rust, docs, process, security
 set -euo pipefail
 
@@ -42,13 +42,14 @@ adx_cmd_logs() {
     esac
   done
   case "$which" in
-    adx|emulator)
+    adx|emulator|logcat)
       local f="$ADX_LOG_DIR/adx.log"
       [ "$which" = emulator ] && f="$ADX_LOG_DIR/emulator-$ADX_AVD_NAME.log"
+      [ "$which" = logcat ] && f="$ADX_LOG_DIR/logcat-$ADX_AVD_NAME.log"
       [ -f "$f" ] || adx_die "no log yet: $f"
       tail -n "$n" "$f" ;;
     dir)      echo "$ADX_LOG_DIR"; ls -la "$ADX_LOG_DIR" ;;
-    *)        adx_die "usage: adx logs [adx|emulator|dir] [-n N]" ;;
+    *)        adx_die "usage: adx logs [adx|emulator|logcat|dir] [-n N]" ;;
   esac
 }
 

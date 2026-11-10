@@ -22,6 +22,10 @@ pub struct Launch {
     pub cold: bool,
     /// `--wipe`: factory reset (destroys the image's user data).
     pub wipe: bool,
+    /// No network (the image's `offline` setting): the emulator's user-mode network
+    /// runs restricted, so the phone reaches neither the internet nor the host's
+    /// services at 10.0.2.2. adb and the emulator console don't use it and keep working.
+    pub offline: bool,
     /// Environment for the emulator process: the SDK and AVD locations aodm resolved
     /// (adx exports its whole config; aodm passes what the emulator reads), then ADX_EMU_ENV.
     pub env: Vec<(String, String)>,
@@ -69,12 +73,58 @@ pub fn args(image: &str, port: u16, l: &Launch) -> Vec<String> {
     if l.wipe {
         a.push("-wipe-data".into());
     }
+    if l.offline {
+        // Wi-Fi (API 31+) and the radio/mobile-data network: both restricted. Wi-Fi
+        // normally runs through netsim, which ignores these options: off for this run.
+        a.extend(["-feature".into(), "-WiFiPacketStream".into()]);
+        for o in ["-wifi-user-mode-options", "-network-user-mode-options"] {
+            a.extend([o.into(), "restrict=on".into()]);
+        }
+    }
     a
 }
 
 /// `$ADX_LOG_DIR/emulator-<image>.log`, the file `adx logs emulator` reads.
 pub fn log_path(log_dir: &Path, image: &str) -> PathBuf {
     log_dir.join(format!("emulator-{image}.log"))
+}
+
+/// `$ADX_LOG_DIR/logcat-<image>.log`: the phone's logcat for its current run.
+pub fn logcat_path(log_dir: &Path, image: &str) -> PathBuf {
+    log_dir.join(format!("logcat-{image}.log"))
+}
+
+/// Saves the phone's logcat on the host (previous runs kept as `.1`… like the emulator
+/// log). Detached; it ends when the emulator exits, and gives up if adb never sees the
+/// phone within `wait` (a failed boot must not leave it waiting for the port's next phone).
+/// shortcut: an adb server restart ends it too (the next start resumes); no size cap per
+/// run (about 4 MB/h idle); upgrade to a supervisor with rotation if days-long runs matter.
+pub fn logcat(adb: &Path, serial: &str, log: &Path, keep: u64, wait: Duration) -> Result<()> {
+    crate::log::shift(log, keep).map_err(Error::io(log))?;
+    let out = File::create(log).map_err(Error::io(log))?;
+    let err = out.try_clone().map_err(Error::io(log))?;
+    // From this start on: a quick-boot snapshot brings back the previous run's buffer.
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let mut child = Command::new("sh")
+        .args([
+            "-c",
+            r#"timeout "$0" "$1" -s "$2" wait-for-device && exec "$1" -s "$2" logcat -v threadtime -T "$3""#,
+        ])
+        .arg(wait.as_secs().to_string())
+        .arg(adb)
+        .arg(serial)
+        .arg(format!("{since}.000"))
+        .stdin(Stdio::null())
+        .stdout(out)
+        .stderr(err)
+        .process_group(0)
+        .spawn()
+        .map_err(Error::io(adb))?;
+    // Reaped here, so a long-running front end (aod-gui) keeps no zombie.
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// Starts the emulator detached (own process group: Ctrl-C or closing aodm's
@@ -214,6 +264,20 @@ pub fn in_use(avd_dir: &Path) -> bool {
     File::open(avd_dir.join("multiinstance.lock")).is_ok_and(|f| f.try_lock_shared().is_err())
 }
 
+/// True once nothing holds the image's lock, polling up to `timeout`: right after a
+/// stop (`aodm restart`, the console's restart) the lock was seen held for a moment
+/// after the emulator process had gone (2026-11-10).
+pub fn free_within(avd_dir: &Path, timeout: Duration) -> bool {
+    let t0 = Instant::now();
+    while in_use(avd_dir) {
+        if t0.elapsed() >= timeout {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    true
+}
+
 /// Error lines in an emulator log (what `adx emulator status` looks for).
 pub fn log_errors(log: &Path) -> Vec<String> {
     fs::read_to_string(log)
@@ -252,6 +316,16 @@ mod tests {
         assert_eq!(
             args("p", 5556, &l).join(" "),
             "-avd p -port 5556 -gpu host -no-boot-anim -no-snapshot-load -wipe-data"
+        );
+        let l = Launch {
+            gpu: "host".into(),
+            offline: true,
+            ..Launch::default()
+        };
+        assert_eq!(
+            args("p", 5556, &l).join(" "),
+            "-avd p -port 5556 -gpu host -no-boot-anim -feature -WiFiPacketStream \
+             -wifi-user-mode-options restrict=on -network-user-mode-options restrict=on"
         );
     }
 

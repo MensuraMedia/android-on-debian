@@ -489,8 +489,11 @@ pub fn open(ctx: &Ctx, save: &Save, new: &str) -> Result<String> {
     let m = verified(ctx, save)?;
     let dir = images::install(ctx, &save.avd(), new, &m.target, false)?;
     Registry::update(&images::cfg_dir(ctx.env, "ADX_AOD_HOME")?, |r| {
-        r.images.entry(new.to_string()).or_default().origin =
-            Some(format!("{}@{}", save.image, save.id));
+        // An opened save of an offline phone stays offline, as a clone does.
+        let offline = r.offline(&save.image);
+        let e = r.images.entry(new.to_string()).or_default();
+        e.origin = Some(format!("{}@{}", save.image, save.id));
+        e.offline = offline;
     })?;
     ctx.log
         .audit("open-save", &save.image, &format!("{} as {new}", save.id));

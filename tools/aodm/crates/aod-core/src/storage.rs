@@ -219,15 +219,17 @@ pub fn gc_plan(ctx: &Ctx) -> Result<Vec<Garbage>> {
             });
         }
     }
-    // Rotated logs beyond ADX_LOG_KEEP (adx.log.N, emulator-*.log.N).
+    // Rotated logs beyond ADX_LOG_KEEP (adx.log.N, emulator-*.log.N, logcat-*.log.N).
     let keep = ctx.env.num("ADX_LOG_KEEP", 5);
     if let Ok(dir) = cfg_dir(ctx.env, "ADX_LOG_DIR") {
         for e in fs::read_dir(&dir).into_iter().flatten().flatten() {
             let f = e.file_name().to_string_lossy().to_string();
-            // Only adx's own logs: adx.log.N and emulator-NAME.log.N.
+            // Only adx's own logs: adx.log.N, emulator-NAME.log.N and logcat-NAME.log.N.
             let old = f
                 .rsplit_once(".log.")
-                .filter(|(base, _)| *base == "adx" || base.starts_with("emulator-"))
+                .filter(|(base, _)| {
+                    *base == "adx" || base.starts_with("emulator-") || base.starts_with("logcat-")
+                })
                 .and_then(|(_, n)| n.parse::<u64>().ok())
                 .is_some_and(|n| n > keep);
             if old && e.path().is_file() {

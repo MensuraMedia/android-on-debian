@@ -16,3 +16,4 @@ claude-rules
 skills
 app-template
 console
+pipeline

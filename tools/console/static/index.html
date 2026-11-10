@@ -242,8 +242,13 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
     </section>
 
     <section class="wrap panel-hidden" id="view-apps">
-      <p class="mini">Apps in <span class="mono" id="apps-dir">~/projects/android-apps</span> (each its own git repo, made with <span class="mono">adx app-template new</span>). Render runs the Roborazzi screenshot tests on the JVM; Run installs on the running emulator and opens the app.</p>
+      <div style="display:flex;gap:12px;align-items:flex-start"><p class="mini" style="flex:1">Apps in <span class="mono" id="apps-dir">~/projects/android-apps</span>. Plan, design and code them with Claude Code; <b>Run pipeline</b> builds, lints, tests (unit + screenshot comparison), installs on the running phone and smoke-tests the launch. Claude runs the same pipeline (<span class="mono">adx pipeline run &lt;App&gt;</span>) and reads its results (<span class="mono">adx pipeline last &lt;App&gt;</span>).</p><span id="newapp-slot"></span></div>
       <div id="apps-body"><div class="empty">Loading…</div></div>
+      <div class="card" style="margin-top:18px">
+        <div class="hd"><h2>Pipeline skills</h2><span class="mono" id="skill-count" style="margin-left:auto;font-size:12px;color:var(--ink-soft)"></span></div>
+        <div class="bd"><p class="mini">Claude Code skills every new app gets in <span class="mono">.claude/skills/</span> (pinned in <span class="mono">config/skills.manifest</span>; skills only, no plugin hooks). After changing the manifest: <span class="mono">adx skills apply &lt;app-dir&gt;</span>.</p>
+          <table><thead><tr><th>Skill</th><th>Source</th><th>Pinned commit</th><th>In apps</th></tr></thead><tbody id="skill-rows"></tbody></table></div>
+      </div>
     </section>
 
     <section class="wrap panel-hidden" id="view-modules">
@@ -254,13 +259,6 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
       </div>
     </section>
 
-    <section class="wrap panel-hidden" id="view-skills">
-      <div class="card">
-        <div class="hd"><h2>Claude Code skills</h2><span class="mono" id="skill-count" style="margin-left:auto;font-size:12px;color:var(--ink-soft)"></span></div>
-        <div class="bd"><p class="mini">Pinned in <span class="mono">config/skills.manifest</span> and vendored into each app's <span class="mono">.claude/skills/</span> (skills only, no plugin hooks). Change the manifest, then <span class="mono">adx skills apply &lt;app-dir&gt;</span>.</p>
-          <table><thead><tr><th>Skill</th><th>Source</th><th>Pinned commit</th><th>In apps</th></tr></thead><tbody id="skill-rows"></tbody></table></div>
-      </div>
-    </section>
 
     <section class="wrap panel-hidden" id="view-activity">
       <div class="sec">
@@ -285,7 +283,7 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
       </div>
     </section>
 
-    <footer>Runs locally at 127.0.0.1 · no account, no cloud · every action runs as a logged job · <span class="mono">adx console stop</span> to close.</footer>
+    <footer>Runs locally (loopback only) · no account, no cloud · every action runs as a logged job · <span class="mono">adx console stop</span> to close.</footer>
   </div>
 </div>
 
@@ -333,7 +331,7 @@ function section(title,count,unit,cards,empty){
   if(cards.length)cards.forEach(c=>l.append(c));else l.append(el("div","empty",empty));
   s.append(l);return s;
 }
-const busyTag=b=>b?`<span class="tag run">${esc({start:"launching",stop:"stopping",save:"saving",clone:"duplicating",rename:"renaming",render:"rendering",run:"installing",install:"installing"}[b]||b)}</span>`:"";
+const busyTag=b=>b?`<span class="tag run">${esc({start:"launching",stop:"stopping",save:"saving",clone:"duplicating",rename:"renaming",render:"recording",pipeline:"pipeline running",new:"creating",install:"installing"}[b]||b)}</span>`:"";
 
 /* ---- Images ---- */
 /* ---- captures: screenshots + screen recordings, one folder per phone image ---- */
@@ -385,6 +383,33 @@ function capsGallery(image){
   fill();
 }
 
+/* a phone's saved logcat: this run or a previous one, filtered, newest lines at the bottom */
+function logcatView(image){
+  const scrim=el("div","modal-scrim");const close=()=>scrim.remove();
+  scrim.onclick=e=>{if(e.target===scrim)close();};
+  const m=el("div","modal");m.style.maxWidth="1100px";
+  const hd=el("div","mhd",`<h3>Logcat · <span class="mono">${esc(image)}</span></h3>`);
+  const runSel=el("select","field");runSel.setAttribute("aria-label","Run");runSel.style.width="auto";
+  const q=el("input","field");q.placeholder="Filter (tag, text, PID)";q.setAttribute("aria-label","Filter");q.style.width="240px";
+  const open=el("button","btn",ICONTXT("folder-open","Log folder"));open.style.marginLeft="auto";
+  open.onclick=async()=>{try{await post("/api/logcat/open",{});}catch(e){toast("Open folder: failed",false,e.message);}};
+  const x=el("button","iconbtn",ICON("x"));x.setAttribute("aria-label","Close");x.onclick=close;
+  hd.append(runSel,q,open,x);
+  const info=el("p","mini");info.style.margin="8px 16px";
+  const pre=el("pre","logpre");pre.style.cssText="margin:0 16px 16px;max-height:65vh;overflow:auto;font-size:11.5px;white-space:pre";
+  m.append(hd,info,pre);scrim.append(m);document.body.append(scrim);
+  document.addEventListener("keydown",function k(e){if(e.key==="Escape"){close();document.removeEventListener("keydown",k);}});
+  let first=true;
+  const fill=async()=>{
+    const d=await getJSON(`/api/logcat?image=${encodeURIComponent(image)}&run=${runSel.value||0}&n=2000&q=${encodeURIComponent(q.value)}`);
+    if(first){first=false;runSel.innerHTML=d.runs.length?d.runs.map(r=>`<option value="${r}">${r?`${r} start${r===1?"":"s"} ago`:"current run"}</option>`).join(""):'<option value="0">current run</option>';}
+    if(!d.runs.includes(Number(runSel.value||0))){info.textContent="No logcat saved yet: it is recorded from the phone's next start (Launch).";pre.textContent="";return;}
+    info.textContent=`${d.path} · ${d.window?"last 8 MB: ":""}${d.total} lines, updated ${d.modified}`+(q.value?` · ${d.matched} match`:"")+(d.lines.length<(q.value?d.matched:d.total)?` · last ${d.lines.length} shown`:"");
+    pre.textContent=d.lines.join("\n");pre.scrollTop=pre.scrollHeight;};
+  let t=null;q.oninput=()=>{clearTimeout(t);t=setTimeout(fill,300);};runSel.onchange=fill;
+  fill().catch(e=>{info.textContent="Could not read the log: "+e.message;});
+}
+
 /* minimal icon toolbar: [[icon,label,onclick,disabled,title,primary]] */
 function tools(items){
   const g=el("div","tools");g.setAttribute("role","group");
@@ -427,8 +452,10 @@ async function loadImages(){
   const phones=(d.phones||[]).map(p=>hcard({
     live:p.running, title:p.phone, sub:`${p.name} · ${p.abi}`,
     facts:[["Android API",p.api],["Image",p.variant],["Screen",p.screen],["RAM",p.ram],["Disk",p.size],["Saves",p.saves==="-"?"none":p.saves],
+      ["Network",p.offline?(p.running&&!p.running_offline?"offline from the next start":"offline (no internet, no host)"):(p.running&&p.running_offline?"running offline until restarted":"online")],
       ["Captures",(()=>{const c=CAPS.captures[p.name]||[];const r=c.filter(i=>i.type==="recording").length;const n=c.length-r;return c.length?`${n} screenshot${n===1?"":"s"} · ${r} recording${r===1?"":"s"}`:"none";})()],["Groups",p.groups]],
     tags:busyTag(p.busy)||(p.running?`<span class="tag ok">${esc(p.state)}</span>`:'<span class="tag off">stopped</span>')+
+      ((p.running?p.running_offline:p.offline)?`<span class="tag warn" title="Started without a network: the emulator gives it no route to the internet or the host">${ICON("plugs")} offline</span>`:"")+
       (p.keyboard==="yes"?"":'<span class="tag warn" title="adx emulator install sets hw.keyboard=yes">no host keyboard</span>'),
     acts:[(()=>{
       const u=`/api/images/${encodeURIComponent(p.name)}`,names=(d.phones||[]).map(x=>x.name);
@@ -441,6 +468,12 @@ async function loadImages(){
           p.running||p.busy,p.running?`${stopFirst}: duplicate copies a stopped image`:"Duplicate this image under a new name"],
         ["pencil-simple","Rename",async()=>post(`${u}/rename`,{new:await askName(`Rename ${p.name}`,p.name,"New name. Its saves, settings and captures move along.",names)}),
           p.running||p.busy,p.running?`${stopFirst}: rename needs a stopped image`:"Rename this image"],
+        [p.offline?"plugs-connected":"plugs",p.offline?"Go online":"Go offline",async()=>{
+          await post(`${u}/net`,{offline:!p.offline});
+          toast(`${p.name}: ${p.offline?"online":"offline"} from its next start`,true);
+          if(p.running&&confirm(`Restart ${p.name} now so it runs ${p.offline?"online":"offline"}? (The quick-boot state is saved first.)`))await post(`${u}/restart`);
+        },p.busy,p.offline?"Give this phone its network back (applies at start)"
+          :"Run this phone with no network: the emulator cuts it off from the internet and the host; nothing changes inside the phone (applies at start)"],
       ]);})(),(()=>{
       const serial=p.running?serialOf(p):null,rec=serial&&recFor(serial);
       if(rec)watchRec();
@@ -449,6 +482,7 @@ async function loadImages(){
         rec?["stop-circle","Stop recording",()=>record(serial,p.name,false),false,`Stop and save the recording (${fmtSecs(rec.seconds)} of ${fmtSecs(rec.limit)})`,false,"rec",`<span class="secs">${fmtSecs(rec.seconds)}</span>`]
            :["record","Record",()=>record(serial,p.name,true),!serial,serial?`Record the screen to ${p.name}'s captures folder (up to ${fmtSecs(CAPS.limit)})`:"Launch the phone first"],
         ["images","Captures",async()=>capsGallery(p.name),false,`Screenshots and recordings of ${p.name}`],
+        ["scroll","Logcat",async()=>logcatView(p.name),false,`${p.name}'s logcat, saved from every start`],
       ]);})()]}));
   body.append(section("Emulator phones",phones.length,"phone",phones,
     d.aodm?"No emulator phones yet: adx emulator install creates one.":"aodm not found: install it with adx devices install."));
@@ -675,27 +709,124 @@ function gallery(app){
   getJSON(`/api/apps/${encodeURIComponent(app.name)}/shots`).then(d=>{g.innerHTML="";
     d.shots.forEach(f=>g.append(el("figure","",`<img loading="lazy" src="/api/apps/${encodeURIComponent(app.name)}/shot/${encodeURIComponent(f)}" alt="${esc(f)}"><figcaption>${esc(f)}</figcaption>`)));});
 }
+const STAGE_MARK={passed:"✓",failed:"✗",running:"…",pending:"·",skipped:"–",interrupted:"■"};
+const stageLine=run=>run?run.stages.map(s=>`${s.name} ${STAGE_MARK[s.status]||"?"}`).join("  ·  "):"never run";
+const runTag=run=>!run?'<span class="tag off">no runs</span>':
+  run.status==="running"?'<span class="tag run">pipeline running</span>':
+  run.status==="interrupted"?'<span class="tag warn">interrupted</span>':
+  `<span class="tag ${run.status==="passed"?"ok":"warn"}">${run.status==="passed"?"passed":"failed: "+esc((run.stages.find(s=>s.status==="failed")||{}).name||"")}</span>`;
+const runURL=(app,run,f)=>`/api/apps/${encodeURIComponent(app)}/runs/${encodeURIComponent(run.id)}/${encodeURIComponent(f)}`;
+/* pick one running phone; resolves to a serial ("" = let the pipeline decide) or throws "cancelled" */
+function pickPhone(serials){
+  if(serials.length<2)return Promise.resolve(serials[0]||"");
+  return new Promise((resolve,reject)=>{
+    const scrim=el("div","modal-scrim"),m=el("div","modal");m.style.maxWidth="420px";
+    m.append(el("div","mhd","<h3>Deploy to which phone?</h3>"));
+    const bd=el("div","");bd.style.cssText="padding:16px;display:grid;gap:8px";
+    const close=v=>{scrim.remove();v===null?reject(new Error("cancelled")):resolve(v);};
+    serials.forEach(s=>{const b=el("button","btn",ICONTXT("device-mobile",s));b.onclick=()=>close(s);bd.append(b);});
+    const no=el("button","btn",ICONTXT("x","Cancel"));no.onclick=()=>close(null);bd.append(no);
+    m.append(bd);scrim.append(m);document.body.append(scrim);scrim.onclick=e=>{if(e.target===scrim)close(null);};
+  });
+}
+/* new app from the template: name + package */
+function newApp(taken){
+  return new Promise((resolve,reject)=>{
+    const scrim=el("div","modal-scrim"),m=el("div","modal");m.style.maxWidth="460px";
+    m.append(el("div","mhd","<h3>New app</h3>"));
+    const bd=el("div","");bd.style.padding="16px";
+    const n=el("input","field");n.placeholder="AppName";n.setAttribute("aria-label","App name");
+    const k=el("input","field");k.placeholder="com.example.appname";k.setAttribute("aria-label","Package");k.style.marginTop="8px";
+    const msg=el("p","mini");msg.style.margin="8px 0 14px";
+    const ok=el("button","btn primary",ICONTXT("check","Create")),no=el("button","btn",ICONTXT("x","Cancel"));
+    const row=el("div","");row.style.cssText="display:flex;gap:8px;justify-content:flex-end";row.append(no,ok);
+    bd.append(n,k,msg,row);m.append(bd);scrim.append(m);document.body.append(scrim);
+    let pkgEdited=false;k.oninput=()=>{pkgEdited=true;valid();};
+    const valid=()=>{const v=n.value.trim(),p=k.value.trim();
+      const bad=!/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(v)?"Name: letters and digits, starting with a letter.":taken.includes(v)?`${v} already exists.`:
+        !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(p)?"Package: lower case, dotted (com.example.app).":"";
+      msg.textContent=bad||"Compose + Roborazzi template, CLAUDE.md, permissions and the pipeline skills; then plan and build it with Claude Code.";
+      msg.style.color=bad?"var(--bad)":"";ok.disabled=!!bad;return !bad;};
+    n.oninput=()=>{if(!pkgEdited)k.value=n.value.trim()?`com.example.${n.value.trim().toLowerCase()}`:"";valid();};
+    const close=v=>{scrim.remove();v===null?reject(new Error("cancelled")):resolve(v);};
+    ok.onclick=()=>{if(valid())close({name:n.value.trim(),package:k.value.trim()});};no.onclick=()=>close(null);
+    scrim.onclick=e=>{if(e.target===scrim)close(null);};valid();n.focus();
+  });
+}
+/* run history of an app: list on the left, the chosen run's stages, screen, diffs and logs on the right */
+function runsView(app){
+  const scrim=el("div","modal-scrim");const close=()=>scrim.remove();
+  scrim.onclick=e=>{if(e.target===scrim)close();};
+  const m=el("div","modal");m.style.maxWidth="1180px";
+  const hd=el("div","mhd",`<h3>Pipeline runs · <span class="mono">${esc(app)}</span></h3>`);
+  const x=el("button","iconbtn",ICON("x"));x.style.marginLeft="auto";x.setAttribute("aria-label","Close");x.onclick=close;hd.append(x);
+  const body=el("div","");body.style.cssText="display:grid;grid-template-columns:230px 1fr;gap:0;min-height:60vh";
+  const list=el("div","");list.style.cssText="border-right:1px solid var(--border);overflow:auto;max-height:75vh";
+  const det=el("div","");det.style.cssText="padding:14px 18px;overflow:auto;max-height:75vh";
+  body.append(list,det);m.append(hd,body);scrim.append(m);document.body.append(scrim);
+  document.addEventListener("keydown",function k(e){if(e.key==="Escape"){close();document.removeEventListener("keydown",k);}});
+  const show=run=>{
+    det.innerHTML="";
+    det.append(el("div","",`<div style="display:flex;gap:10px;align-items:center">${runTag(run)}<span class="mini">${esc(run.started)} · ${Math.round(run.secs||0)} s · commit <span class="mono">${esc(run.git.commit)}</span>${run.git.dirty?" + uncommitted changes":""}${run.target?` · ${esc(run.target.serial)} (${esc(run.target.image)})`:""}</span></div><p class="mini mono" style="margin:6px 0 12px">${esc(run.dir)}</p>`));
+    const t=el("table");t.innerHTML="<thead><tr><th>Stage</th><th>Result</th><th>Time</th><th>Summary</th></tr></thead>";
+    const tb=el("tbody");
+    run.stages.forEach(s=>{const tr=el("tr","",`<td class="mono" style="white-space:nowrap"><b>${esc(s.name)}</b></td><td><span class="tag ${s.status==="passed"?"ok":s.status==="failed"?"warn":s.status==="running"?"run":"off"}">${esc(s.status)}</span></td><td class="mono">${s.secs!=null?Math.round(s.secs)+" s":""}</td>`);
+      const td=el("td");const pre=el("pre","");pre.style.cssText="margin:0;white-space:pre-wrap;font-size:11.5px;max-height:220px;overflow:auto";pre.textContent=s.summary||"";td.append(pre);
+      if(s.log&&run.files.includes(s.log)){const b=el("button","btn",ICONTXT("scroll",s.log));b.style.marginTop="6px";
+        b.onclick=async()=>{const r=await fetch(runURL(app,run,s.log));pre.textContent=await r.text();pre.scrollTop=pre.scrollHeight;};td.append(b);}
+      tr.append(td);tb.append(tr);});
+    t.append(tb);det.append(t);
+    const imgs=run.files.filter(f=>f==="screen.png"||f.startsWith("diff-"));
+    if(imgs.length){const g=el("div","gallery");g.style.marginTop="14px";
+      imgs.forEach(f=>g.append(el("figure","",`<img loading="lazy" src="${runURL(app,run,f)}" alt="${esc(f)}"><figcaption>${esc(f==="screen.png"?"phone screen after launch":f)}</figcaption>`)));det.append(g);}
+    const other=run.files.filter(f=>/\.(txt|xml|md)$/.test(f));
+    if(other.length){const p=el("p","mini","Files: ");p.style.marginTop="12px";
+      other.forEach(f=>{const a=el("a","mono",esc(f));a.href=runURL(app,run,f);a.target="_blank";a.style.marginRight="12px";p.append(a);});det.append(p);}
+  };
+  getJSON(`/api/apps/${encodeURIComponent(app)}/runs`).then(d=>{
+    if(!d.runs.length){det.append(el("div","empty","No runs yet: Run pipeline on the app's card."));return;}
+    d.runs.forEach((r,i)=>{const b=el("button","",`<div style="display:flex;justify-content:space-between;gap:6px"><span class="mono">${esc(r.id)}</span>${runTag(r)}</div><div class="mini mono" style="margin-top:3px">${esc(r.git.commit)} · ${Math.round(r.secs||0)} s</div>`);
+      b.style.cssText="display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--border);background:none;color:inherit;cursor:pointer";
+      b.onclick=()=>{list.querySelectorAll("button").forEach(x=>x.style.background="none");b.style.background="var(--surface-2, rgba(127,127,127,.12))";show(r);};
+      list.append(b);if(i===0)b.click();});
+  }).catch(e=>det.append(el("div","empty","Could not load runs: "+e.message)));
+}
+let appsPoll=null;
 async function loadApps(){
   const body=$("#apps-body");
   let d;try{d=await getJSON("/api/apps");}catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
   $("#apps-dir").textContent=d.dir;
-  const devs=(await getJSON("/api/devices").catch(()=>({devices:[]}))).devices||[];
+  const devs=((await getJSON("/api/devices").catch(()=>({devices:[]}))).devices||[]).filter(s=>s.startsWith("emulator-"));
+  const slot=$("#newapp-slot");slot.innerHTML="";
+  slot.append(button("plus","New app","",async()=>{const v=await newApp((d.apps||[]).map(a=>a.name));
+    await post("/api/apps-new",v);toast(`Creating ${v.name}: progress in Activity`,true);},false,"Create an app from the Compose + Roborazzi template"));
   body.innerHTML="";
   const cards=(d.apps||[]).map(a=>{
+    const run=a.last_run,u=`/api/apps/${encodeURIComponent(a.name)}`;
     let thumb=null;
-    if(a.shots){thumb=el("button","thumb");thumb.title=`${a.shots} screenshots: open`;thumb.setAttribute("aria-label",`Open ${a.name} screenshots`);
-      thumb.onclick=()=>gallery(a);
-      getJSON(`/api/apps/${encodeURIComponent(a.name)}/shots`).then(s=>{if(s.shots[0])thumb.innerHTML=`<img alt="" src="/api/apps/${encodeURIComponent(a.name)}/shot/${encodeURIComponent(s.shots[0])}">`;}).catch(()=>{});}
+    if(run&&run.files.includes("screen.png")){thumb=el("button","thumb");thumb.title="Last run's phone screen: open the runs";
+      thumb.innerHTML=`<img alt="" src="${runURL(a.name,run,"screen.png")}">`;thumb.onclick=()=>runsView(a.name);}
+    else if(a.shots){thumb=el("button","thumb");thumb.title=`${a.shots} screenshots: open`;thumb.onclick=()=>gallery(a);
+      getJSON(`${u}/shots`).then(s=>{if(s.shots[0])thumb.innerHTML=`<img alt="" src="${u}/shot/${encodeURIComponent(s.shots[0])}">`;}).catch(()=>{});}
+    const running=a.busy==="pipeline"||(run&&run.status==="running");
     return hcard({thumb,title:a.name,sub:a.package||"no applicationId",
-      facts:[["Screenshots",a.shots||"none yet"],["Branch",a.branch],["Last commit",a.last_commit],["Skills",a.skills.length||"none"],["CLAUDE.md",a.has_claude_md?"yes":"missing"]],
-      tags:busyTag(a.busy),small:a.path,
-      acts:[
-        button("image","Render","",()=>post(`/api/apps/${encodeURIComponent(a.name)}/render`),a.busy==="render","Run the Roborazzi screenshot tests (./gradlew recordRoborazziDebug)"),
-        button("rocket-launch","Run","primary",()=>post(`/api/apps/${encodeURIComponent(a.name)}/run`),a.busy==="run"||!devs.length,devs.length?"Install on the running emulator and open it":"Launch an emulator phone first (Images)"),
-        button("folder-open","Open folder","",()=>post(`/api/apps/${encodeURIComponent(a.name)}/open`)),
-      ]});
+      facts:[["Pipeline",stageLine(run)],["Last run",run?`${run.started}${run.secs?` · ${Math.round(run.secs)} s`:""}`:"never"],
+        ["Commit",a.last_commit||"none yet"],["Branch",a.branch],["Skills",a.skills.length||"none"],["CLAUDE.md",a.has_claude_md?"yes":"missing"]],
+      tags:running?'<span class="tag run">pipeline running</span>':(busyTag(a.busy)||runTag(run)),
+      acts:[tools([
+        ["rocket-launch","Run pipeline",async()=>{const serial=await pickPhone(devs);await post(`${u}/pipeline`,{serial});
+          toast(`${a.name}: pipeline started${serial?` (deploys to ${serial})`:devs.length?"":" (starts the phone first)"}`,true);},running,
+          devs.length?"Build, lint, test, install on the phone and smoke-test the launch":"Build, lint, test; no phone runs, so it starts one, installs and smoke-tests",true],
+        ["clock-counter-clockwise","Runs",async()=>runsView(a.name),false,"Pipeline runs: stages, logs, phone screen, screenshot diffs"],
+        ["image","Record screenshots",()=>post(`${u}/render`),a.busy==="render"||running,"Re-record the reference screenshots after an intended UI change (./gradlew recordRoborazziDebug)"],
+        ["folder-open","Open folder",()=>post(`${u}/open`),false,"Open the app's folder"],
+      ])]});
   });
-  body.append(section("Apps",cards.length,"app",cards,"No apps yet: adx app-template new <Name> <package>."));
+  body.append(section("Apps",cards.length,"app",cards,"No apps yet: New app, or adx app-template new <Name> <package>."));
+  loadSkills();
+  clearTimeout(appsPoll);
+  if((d.apps||[]).some(a=>a.busy==="pipeline"||(a.last_run&&a.last_run.status==="running")))
+    appsPoll=setTimeout(()=>{if(current==="apps")loadApps();},2500);
 }
 
 /* ---- Modules ---- */
@@ -724,7 +855,7 @@ async function loadSkills(){
   $("#skill-count").textContent=`${d.skills.length} skills`;
   rows.innerHTML="";
   d.skills.forEach(s=>rows.append(el("tr","",`<td><b class="mono">${esc(s.name)}</b><div style="font-size:12px;color:var(--ink-soft)">${esc(s.note)}</div></td>`+
-    `<td><a href="https://github.com/${esc(s.repo)}" target="_blank" rel="noopener" class="mono" style="display:inline-flex;gap:5px;align-items:center">${esc(s.repo)}${ICON("arrow-square-out")}</a><div class="mono" style="font-size:11px;color:var(--ink-soft)">${esc(s.path)}</div></td>`+
+    `<td><span class="mono">github.com/${esc(s.repo)}</span><div class="mono" style="font-size:11px;color:var(--ink-soft)">${esc(s.path)}</div></td>`+
     `<td class="mono">${esc(s.commit.slice(0,12))}</td><td>${s.apps.length?s.apps.map(a=>`<span class="tag ok">${esc(a)}</span>`).join(" "):'<span class="tag off">none</span>'}</td>`)));
 }
 
@@ -798,16 +929,22 @@ async function refreshNet(){
   if(!NET||!NET.length){
     btn.innerHTML=ICON("globe");btn.disabled=true;btn.title="No phone running";
     label.textContent="Internet: no phone";note.textContent="Launch a phone first.";return;}
-  const off=NET.filter(p=>p.internet==="off");
+  const sw=NET.filter(p=>!p.offline_mode),cutoff=NET.length-sw.length;
+  if(!sw.length){
+    btn.classList.add("cut");btn.innerHTML=ICON("plugs");btn.disabled=true;btn.setAttribute("aria-pressed","true");
+    btn.title="Started offline: the emulator gives it no network (Images: Go online)";
+    label.textContent="Internet: off";note.textContent="Started offline. Images: Go online.";return;}
+  const off=sw.filter(p=>p.internet==="off");
   btn.disabled=false;
   if(off.length){
     btn.classList.add("cut");btn.innerHTML=ICON("wifi-slash");
     btn.title="Restore the phone's internet (airplane mode off)";btn.setAttribute("aria-pressed","true");
-    label.textContent=off.length===NET.length?"Internet: off":`Internet: off for ${off.length}/${NET.length}`;
-    note.textContent="Airplane mode on: no Wi-Fi or data.";
+    label.textContent=off.length+cutoff===NET.length?"Internet: off":`Internet: off for ${off.length+cutoff}/${NET.length}`;
+    note.textContent="Airplane mode on: no Wi-Fi or data."+(cutoff?` ${cutoff} started offline.`:"");
   }else{
     btn.innerHTML=ICON("globe");btn.title="Cut the phone's internet (airplane mode on)";btn.setAttribute("aria-pressed","false");
-    label.textContent="Internet: on";note.textContent=`${NET.length} phone${NET.length===1?"":"s"} online. Click to cut.`;
+    label.textContent=cutoff?`Internet: on for ${sw.length}/${NET.length}`:"Internet: on";
+    note.textContent=`${sw.length} phone${sw.length===1?"":"s"} online. Click to cut.`+(cutoff?` ${cutoff} started offline.`:"");
   }
 }
 $("#net-btn").onclick=async()=>{
@@ -824,7 +961,7 @@ $("#net-btn").onclick=async()=>{
 
 /* ---- navigation ---- */
 const NAV=[["images","Images",loadImages],["assets","Assets",loadAssets],["apps","Apps",loadApps],["modules","Modules",loadModules],
-  ["skills","Skills",loadSkills],["activity","Activity",loadActivity],["settings","Settings",loadSettings]];
+  ["activity","Activity",loadActivity],["settings","Settings",loadSettings]];
 let current="images";
 const nav=$("#nav");
 NAV.forEach(([id,label])=>{

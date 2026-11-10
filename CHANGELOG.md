@@ -12,7 +12,7 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - `./adx up` now also runs the `console` module (default profile): it installs
   the "adx console" menu entry and its icon (`~/.local/share/icons/hicolor/*/apps/adx-console.*`);
   nothing is downloaded (Python standard library). `adx console start` serves
-  http://127.0.0.1:8766 (`ADX_CONSOLE_PORT`). The console creates
+  http://127.0.0.2:8766 (`ADX_CONSOLE_HOST`, `ADX_CONSOLE_PORT`). The console creates
   `~/.local/share/adx/assets/` (your uploads and per-phone captures, see
   `ADX_CONSOLE_ASSETS_DIR`, `ADX_CONSOLE_UPLOAD_MAX_MB`) and job logs in
   `~/.local/state/adx/console/` only when used. Rolling back: `adx console
@@ -97,6 +97,83 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- `docs/app-development-and-release.md`: the needs and requirements of app
+  development and release with this environment. It covers:
+  - machine, toolchain and app project requirements;
+  - the pipeline stages, pass criteria, results and exit codes;
+  - a definition of done;
+  - release requirements: release AAB, upload key and Play App Signing,
+    version and target API rules, testing on physical phones, Play Console
+    requirements (closed test for new personal accounts, listing, privacy
+    policy, Data safety), other Android stores, why not the iOS App Store;
+  - a release checklist of what is still manual.
+- `adx` on PATH for non-interactive shells (Claude Code's tool shell, scripts):
+  `adx shell-env install` links `~/.local/bin/adx`.
+- App pipeline (`pipeline` module, `tools/pipeline/pipeline.py`, Python
+  standard library; in the default profile): `adx pipeline run <App>` builds
+  (assembleDebug), lints (lintDebug; errors fail), tests (unit tests plus
+  Roborazzi verify, or record on the first run), installs on the running
+  phone (`--serial` if several; starts `ADX_PIPELINE_IMAGE` if none) and
+  smoke-tests the launch (still running after `ADX_PIPELINE_SMOKE_SECS`, no
+  crash or ANR; screen and logcat saved). Stops at the first failure and
+  reports what Claude needs to fix (compiler/lint errors, failing tests,
+  screenshot diffs, crash stack). Runs: `ADX_PIPELINE_DIR/<App>/<run-id>/`
+  (`run.json`, `summary.md`, stage logs, evidence), last `ADX_PIPELINE_KEEP`
+  kept; `adx pipeline last|list <App>`; log `$ADX_LOG_DIR/pipeline.log`.
+  The app template's CLAUDE.md tells Claude to run it after every change.
+  Review fixes before release:
+  - an interrupted run (Ctrl-C, SIGTERM) is recorded as `interrupted`, and a
+    run whose process died shows as interrupted, so the console doesn't
+    stay "running" forever;
+  - run ids are UTC with a suffix on collision;
+  - deploy and smoke hold a per-phone lock (and auto-start a global one);
+  - a deploy of an earlier build warns when the APK is older than the
+    sources;
+  - "nothing ran" fails;
+  - stale lint or test reports aren't counted after a failure;
+  - crash evidence is the full stack (`crash.txt`, with the cause), and the
+    package match has boundaries (no false crashes or ANRs from
+    `com.example.app2`);
+  - the phone is woken before launch, the process check covers
+    `android:process` names, and the package is read from the APK
+    (`aapt2`);
+  - an empty screencap is skipped;
+  - committed `*_compare.png` files are never deleted;
+  - runs are private (umask 077, folder 700);
+  - the console serves run files only as PNG or plain text;
+  - configuration comes from `config/defaults.env`
+    (`ADX_PIPELINE_GRADLE_TIMEOUT`; `ADX_PIPELINE_IMAGE` follows a
+    `local.env` `ADX_AVD_NAME`).
+- Console Apps page rebuilt around the pipeline: each app shows its last run
+  stage by stage (live while running) with the phone's screen after launch;
+  Run pipeline (asks which phone if several run), Runs (history with stage
+  summaries, logs, screen, screenshot diffs), Record screenshots, Open
+  folder; **New app** (template, with name and package checks; package
+  segments that are Java/Kotlin keywords are refused here and by
+  `adx app-template new`). The
+  pipeline skills table moved here from its own page (skills belong to the
+  app pipeline); the Skills sidebar page and the old Run button are gone.
+- Offline phones: `aodm net NAME offline|online` (registry `offline` in
+  `images.toml`) starts an image with no network, set outside the phone:
+  the emulator's user-mode network runs restricted (`restrict=on` for Wi-Fi
+  and mobile data, netsim Wi-Fi off for that run), so the phone reaches
+  neither the internet, DNS nor the host at 10.0.2.2, while adb, the console
+  port and the window keep working and no phone setting changes (Bluetooth
+  and SMS between emulators stay, see docs/security.md). `aodm start`,
+  aod-gui, the console and `adx emulator start` (asks aodm, else reads the
+  registry) all honour it; a clone or opened save of an offline phone is
+  offline; `aodm show`/`list --json` report it. Console:
+  **Go offline / Go online** on each phone's card (offers a restart when the
+  phone runs), a Network spec and an "offline" tag; the sidebar Internet
+  switch shows such phones as off and leaves them alone.
+- Per-phone logcat: every start (aodm, aod-gui, console, `adx emulator
+  start`) saves the phone's logcat (`-v threadtime`, from that start on; it
+  gives up if the phone never reaches adb within `ADX_EMU_BOOT_TIMEOUT`)
+  to `$ADX_LOG_DIR/logcat-NAME.log`, previous starts kept as `.1`… up to
+  `ADX_LOG_KEEP`, removed beyond that by `aodm gc`. Read it with
+  `adx logs logcat`, `aodm logs --image NAME --logcat`, or **Logcat** on the
+  console's phone card (run picker, filter, open the log folder;
+  `GET /api/logcat`, last 8 MB of a run).
 - `docs/security.md`: the measured security posture of the emulator phones
   and the tools around them (image, network exposure, host, data at rest,
   console and agents), the controls available, and one open finding in the
@@ -267,6 +344,23 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- Security: an app inside an online emulator phone could reach the adx
+  console at 10.0.2.2:8766 by sending `Host: 127.0.0.1` itself, read every
+  phone's logcat and run console actions (e.g. put an offline phone back
+  online). The console now binds to `ADX_CONSOLE_HOST` (default 127.0.0.2,
+  still loopback), which the emulator's 10.0.2.2 does not map to: from the
+  phone the connection is refused. URL: http://127.0.0.2:8766 (the menu
+  entry and `adx console start` follow); docs/security.md corrected.
+- The console window (Chromium-family `--app`, own profile) made the
+  browser's own outside connections (updates, components, stats; seen:
+  Brave to a CDN on 443). It now starts with background networking and
+  component updates off and a dead proxy for everything but loopback, so the
+  console runs fully offline: no outside connection in a 60 s watch. Links
+  to GitHub on the Skills page no longer open in that window.
+- `aodm restart` (and the console's restart) sometimes failed with "image
+  files are locked by another process": the image lock was still held for a
+  moment after the emulator had exited. Start now waits up to 10 s for it
+  (and says so).
 - Host keyboard did not type into the emulator: `avdmanager` creates AVDs with
   `hw.keyboard=no`. `adx emulator create` (and `install`) now sets
   `hw.keyboard=$ADX_AVD_HW_KEYBOARD` (default `yes`) in the AVD's `config.ini`,

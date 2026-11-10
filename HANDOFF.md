@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-09 (v0.2.0 released; `feat/aodm` merged into `main`; adx console)
+# Handoff — updated 2026-11-10 (v0.2.0 released; adx console; offline phones, per-phone logcat; app pipeline; app dev & release requirements)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -18,7 +18,12 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
 | Phone image manager | On `main` (merged from `feat/aodm`, P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
-| Web console | `adx console start` (menu: adx console, own icon in menu/panel/Alt+Tab) → http://127.0.0.1:8766, Python stdlib only. Images: aodm Launch/Stop, Save, Duplicate (clone), Rename, plus per-phone Screenshot, Record (≤180 s) and Captures gallery (`~/.local/share/adx/assets/captures/<image>/`); system images. Assets: upload folders (wallpapers, photos & videos, sounds, APKs) + top 10 phone features. Sidebar: Internet switch (airplane mode, ping-checked). Apps (Render/Run/Open, screenshot gallery), Modules (Install, doctor), Skills, Activity, Settings. Every page and action verified in headless Chromium and against the API 37 emulator (phone state reset afterwards); **not yet adversarially reviewed**. Server log `~/.local/state/adx/console.log`, job logs `~/.local/state/adx/console/` |
+| Web console | `adx console start` (menu: adx console, own icon in menu/panel/Alt+Tab) → http://127.0.0.2:8766 (out of the phones' reach), Python stdlib only. Images: aodm Launch/Stop, Save, Duplicate (clone), Rename, plus per-phone Screenshot, Record (≤180 s) and Captures gallery (`~/.local/share/adx/assets/captures/<image>/`); system images. Assets: upload folders (wallpapers, photos & videos, sounds, APKs) + top 10 phone features. Sidebar: Internet switch (airplane mode, ping-checked). Per phone: Go offline / Go online and a Logcat viewer (below). Apps (pipeline: New app, Run pipeline, Runs, Record screenshots, Open folder; pipeline skills), Modules (Install, doctor), Activity, Settings. Every page and action verified in headless Chromium and against the API 37 emulator (phone state reset afterwards); Whole console **not yet adversarially reviewed** (only the offline/logcat change was, 2026-11-10). Server log `~/.local/state/adx/console.log`, job logs `~/.local/state/adx/console/` |
+| App dev & release docs | [docs/app-development-and-release.md](docs/app-development-and-release.md) (2026-11-10): machine/toolchain/project requirements, pipeline, definition of done, release and store requirements, manual release checklist |
+| App pipeline | `adx pipeline run <App>` (build → lint → test → deploy → smoke) with run records in `~/.local/share/adx/pipeline/<App>/`; console Apps page (Run pipeline, Runs, New app, pipeline skills). Verified 2026-11-10: MeridianWeather and HelloAdx pass all stages; a compile error, a screenshot change and a launch crash each fail the right stage with the evidence; a fresh template app records its references on the first run and verifies on the second; console flow in headless Chromium |
+| Console offline | The console needs no internet. Its window (Brave/Chrome `--app`, profile `~/.local/state/adx/console-window`) runs with background networking off and a dead proxy for non-loopback traffic; verified 2026-11-10: no outside connections in 60 s (before: Brave reached a CDN). Skills-page GitHub links don't open there |
+| Offline phones | `aodm net NAME offline\|online` (registry `offline`), console **Go offline** on the card. Applies at start, in every start path (aodm, aod-gui, console, `adx emulator start`): restricted user-mode network + netsim Wi-Fi off. Verified 2026-11-10 on API 37 / emulator 37.2.13: ping, TCP out and 10.0.2.2 blocked, adb works, back online the network returns; round trip through the console UI with restart |
+| Per-phone logcat | Every start saves `~/.local/state/adx/logcat-NAME.log` (previous starts `.1`…`.5`, `ADX_LOG_KEEP`): `adx logs logcat`, `aodm logs --image NAME --logcat`, console **Logcat** (run picker, filter). Verified on both start paths |
 | Security | Posture measured and written up in [docs/security.md](docs/security.md) (2026-11-09): no inbound path from the internet (NAT, loopback-only ports, ufw on); test-device weaknesses accepted by decision; one open finding in LinSmartPhone (separate repo, not fixed here) |
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
 | Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `8894b30`); `feat/aodm` merged (`4b5f242`) and can be deleted |
@@ -59,8 +64,32 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   - Set wallpaper opens the phone's own preview (Photos' SetWallpaperActivity);
     the user confirms on the phone: Android has no adb command to set one.
   - Recording state and demo-mode state live in the server's memory only.
-- Phone logs (logcat: app logs, crashes, ANRs) aren't kept anywhere; only the
-  emulator process log per image, `adx.log` and console job logs are.
+- Logcat capture, recorded rather than fixed: it starts with the phone, so a
+  phone already running when it is started otherwise (e.g. by a bare
+  `emulator`) has none; an adb server restart ends it until the next start;
+  no size cap per run (a chatty day can reach tens of MB; the console viewer
+  reads the whole file); no crash/ANR extracts yet.
+- App pipeline, recorded rather than fixed:
+  - one phone per run, and only emulators (no physical phones yet);
+  - smoke checks only that the app launches and stays up: no instrumented
+    or UI tests on the phone;
+  - debug builds only, no release stage (docs/app-development-and-release.md §7);
+  - an interrupted run leaves Gradle's daemon (by design) and may leave a
+    `gradlew` child until it ends;
+  - HelloAdx and MeridianWeather keep their screenshot references in
+    `app/build/outputs/roborazzi` (not committed), so `gradle clean` makes
+    the next run re-record them.
+- `aodm stop` can report "stopped" while the exiting emulator still holds the
+  image lock for a moment (the review's likely cause: /proc cmdline empties
+  before the process releases its files). Start waits up to 10 s for it; a
+  clone/save/wipe issued right after a stop could still be refused once.
+  Proper fix: have stop wait for the lock too.
+- Offline mode leaves non-IP channels open by design: Bluetooth/BLE between
+  emulators (netsim), SMS and calls between emulators, the shared clipboard.
+- Offline mode changes take effect at the next start (the card offers a
+  restart). It relies on the emulator's `-feature -WiFiPacketStream` and
+  `restrict=on` options: re-check after an emulator update (docs/security.md
+  shows how).
 - The emulator's side toolbar can stay behind on another workspace when the
   phone window moves; dragging the phone window re-docks it.
 - `config/claude-global-rules.md` gained an `ANDROID_SERIAL` note (several
@@ -95,11 +124,16 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Next steps
 
-0. adx console follow-ups: adversarial + deployment review; per-phone logcat
-   capture (`logs/<image>/`, crash/ANR extracts, viewer on each card) was
-   offered on 2026-11-09 and awaits the owner; optional security controls
-   from docs/security.md (filtering Private DNS, offline/filtered network
-   mode per image, `hw.audioInput=no`) only if the owner asks.
+0. App pipeline, next pieces (owner to choose): "Fix with Claude" (console
+   starts headless Claude Code on a failed run, deferred by decision);
+   instrumented/UI tests on the phone (connectedAndroidTest) and a scripted
+   mobile-mcp walkthrough as a stage; release build + signing; a pipeline
+   section in HelloAdx's and MeridianWeather's own CLAUDE.md (they predate
+   the template change).
+1. adx console follow-ups: adversarial + deployment review of the whole
+   console; logcat crash/ANR extracts if wanted; remaining optional security
+   controls from docs/security.md (filtering Private DNS, a *filtered*
+   network mode, `hw.audioInput=no`) only if the owner asks.
 1. **Phone image manager (Rust)** on branch `feat/aodm`: plan approved; P0
    (spike) and P1 (gate, devtools, rust, agents, workflow, CI, workspace core)
    done and reviewed (30 findings fixed); P2 (inventory, process detection,
@@ -135,6 +169,20 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   instruction (their Bash tool is not technically restricted).
 
 ## Decisions
+
+- 2026-11-10: the console is an AI (Claude)-integrated environment, not an
+  IDE: Claude Code plans, designs and codes; the environment assembles,
+  checks, tests and deploys to the emulator for review and iteration.
+  Skills belong to the app pipeline (applied at app creation). First
+  version: Claude stays in the owner's Claude Code sessions and reads the
+  pipeline's results (no console-launched Claude yet); deploys go to the
+  running phone, asking which if several run.
+
+- 2026-11-10: the owner asked for per-phone logcat capture and an offline
+  option per phone that needs no network configuration on the phone itself.
+  Offline is set outside the phone (emulator flags), stored in aodm's
+  registry, so every front end shares it; logcat sits next to the emulator
+  log in `ADX_LOG_DIR` and rotates the same way.
 
 - 2026-11-09: the adx console (web GUI) is the OS/phone image manager the
   owner uses day to day; it owns the new app icon. `aod-gui` keeps its

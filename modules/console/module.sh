@@ -1,7 +1,7 @@
 MOD_DESC="Local web console (adx console start): phone images, assets, apps, modules, skills, activity, settings"
 
 _server()  { echo "$ADX_ROOT/tools/console/server.py"; }
-_url()     { echo "http://127.0.0.1:$ADX_CONSOLE_PORT"; }
+_url()     { echo "http://$ADX_CONSOLE_HOST:$ADX_CONSOLE_PORT"; }
 _pidfile() { echo "$ADX_LOG_DIR/console.pid"; }
 _logfile() { echo "$ADX_LOG_DIR/console.log"; }
 _desktop_file() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/applications/adx-console.desktop"; }
@@ -100,13 +100,17 @@ mod_remove() {
 }
 
 # Open the console in its own chromeless window (Chromium-family --app mode,
-# isolated profile), else the default browser.
+# isolated profile), else the default browser. The window works offline: the
+# browser's own background traffic (updates, components, stats) is off, and every
+# non-loopback request goes to a dead proxy (loopback is never proxied).
 mod_open() {
   local b prof="$ADX_LOG_DIR/console-window"
   for b in google-chrome google-chrome-stable chromium chromium-browser brave-browser microsoft-edge; do
     if adx_have "$b"; then
       "$b" --app="$(_url)" --class=adx-console --user-data-dir="$prof" --window-size=1240,860 \
-        --no-first-run --no-default-browser-check >/dev/null 2>&1 &
+        --no-first-run --no-default-browser-check --disable-background-networking \
+        --disable-component-update --no-pings --proxy-server="socks5://127.0.0.1:9" \
+        >/dev/null 2>&1 &
       return 0
     fi
   done
@@ -121,8 +125,9 @@ mod_start() {
     adx_have python3 || adx_die "python3 not found"
     mkdir -p "$ADX_LOG_DIR"
     ADX_ROOT="$ADX_ROOT" ADX_APPS_DIR="$ADX_APPS_DIR" ADX_LOG_DIR="$ADX_LOG_DIR" \
-      ANDROID_HOME="$ANDROID_HOME" ADX_CONSOLE_PORT="$ADX_CONSOLE_PORT" \
+      ANDROID_HOME="$ANDROID_HOME" ADX_CONSOLE_HOST="$ADX_CONSOLE_HOST" ADX_CONSOLE_PORT="$ADX_CONSOLE_PORT" \
       ADX_CONSOLE_ASSETS_DIR="$ADX_CONSOLE_ASSETS_DIR" ADX_CONSOLE_UPLOAD_MAX_MB="$ADX_CONSOLE_UPLOAD_MAX_MB" \
+      ADX_PIPELINE_DIR="$ADX_PIPELINE_DIR" \
       setsid python3 "$(_server)" >>"$(_logfile)" 2>&1 < /dev/null &
     echo "$!" > "$(_pidfile)"
     for i in $(seq 1 20); do

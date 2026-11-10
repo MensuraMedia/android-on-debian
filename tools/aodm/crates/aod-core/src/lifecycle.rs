@@ -164,7 +164,13 @@ pub fn start(
             }
         } else if let Some(problem) = &i.problem {
             out.push(err(&i.name, Error::Refused(format!("broken: {problem}"))));
-        } else if emu::in_use(&i.dir) {
+        } else if emu::in_use(&i.dir) && {
+            (ctx.say)(&format!(
+                "{}: waiting for its image lock to be released ...",
+                i.name
+            ));
+            !emu::free_within(&i.dir, Duration::from_secs(10))
+        } {
             out.push(err(
                 &i.name,
                 Error::Refused("image files are locked by another process (another user's or a foreign emulator?)".into()),
@@ -217,17 +223,28 @@ pub fn start(
     for i in todo {
         let started = ports::pick(&i.name, &slots, &reserved, &used, ports::bindable).and_then(|port| {
             let log = emu::log_path(&log_dir, &i.name);
-            let child = emu::spawn(&ctx.emulator, &i.name, port, launch, &log)?;
+            let l = Launch {
+                offline: reg.offline(&i.name),
+                ..launch.clone()
+            };
+            let child = emu::spawn(&ctx.emulator, &i.name, port, &l, &log)?;
             ctx.log.info(&format!(
-                "start {} on emulator-{port} (pid {}, gpu {}, headless {}, cold {}, wipe {}, log {})",
+                "start {} on emulator-{port} (pid {}, gpu {}, headless {}, cold {}, wipe {}, offline {}, log {})",
                 i.name,
                 child.id(),
-                launch.gpu,
-                launch.headless,
-                launch.cold,
-                launch.wipe,
+                l.gpu,
+                l.headless,
+                l.cold,
+                l.wipe,
+                l.offline,
                 log.display()
             ));
+            let lc = emu::logcat_path(&log_dir, &i.name);
+            let wait = Duration::from_secs(ctx.env.num("ADX_EMU_BOOT_TIMEOUT", 240));
+            match emu::logcat(&ctx.adb.bin, &format!("emulator-{port}"), &lc, l.log_keep, wait) {
+                Ok(()) => ctx.log.info(&format!("{}: logcat to {}", i.name, lc.display())),
+                Err(e) => ctx.log.warn(&format!("{}: logcat not saved: {e}", i.name)),
+            }
             Ok((port, child, log))
         });
         match started {

@@ -18,7 +18,7 @@ use aod_core::lifecycle::{self, Ctx, Outcome};
 use aod_core::log::Logger;
 use aod_core::registry::{self, Registry};
 use aod_core::{avd, emu, images, proc, saves};
-use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand};
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use serde_json::json;
 
 use admin::ConfigCmd;
@@ -102,6 +102,9 @@ enum Cmd {
         /// The emulator log of this image instead.
         #[arg(long, value_name = "NAME")]
         image: Option<String>,
+        /// With --image: the phone's logcat (saved from each start) instead.
+        #[arg(long, requires = "image")]
+        logcat: bool,
         /// Only this level and above: info, warn, error.
         #[arg(long)]
         level: Option<String>,
@@ -167,6 +170,18 @@ enum ImageCmd {
     Delete { image: String },
     /// Factory-reset a stopped image's user data without booting it (asks first).
     Wipe { image: String },
+    /// Network of an image from its next start: `offline` (the emulator gives the phone
+    /// no route out; adb keeps working) or `online`. Without a mode: show it.
+    Net {
+        image: String,
+        mode: Option<NetMode>,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq, ValueEnum)]
+enum NetMode {
+    Online,
+    Offline,
 }
 
 #[derive(Subcommand)]
@@ -441,8 +456,17 @@ fn run(
             lines,
             follow,
             image,
+            logcat,
             level,
-        } => admin::logs(env, lines, follow, image.as_deref(), level.as_deref(), out)?,
+        } => admin::logs(
+            env,
+            lines,
+            follow,
+            image.as_deref(),
+            logcat,
+            level.as_deref(),
+            out,
+        )?,
         Cmd::Audit { since, image } => admin::audit(env, since.as_deref(), image.as_deref(), out)?,
         Cmd::Disk => {
             let (images, _, _) = inventory(env, log)?;
@@ -486,6 +510,35 @@ fn image(c: ImageCmd, ctx: &Ctx, out: &mut Out, dry: bool) -> anyhow::Result<()>
                 c.images.iter().map(|r| json!(r)),
             );
             problems(&images);
+        }
+        ImageCmd::Net { image, mode } => {
+            let (images, procs, reg) = inventory(env, log)?;
+            let img = one(&images, &image)?;
+            let offline = match mode {
+                None => reg.offline(&image),
+                Some(m) => {
+                    let offline = m == NetMode::Offline;
+                    Registry::update(&images::cfg_dir(env, "ADX_AOD_HOME")?, |r| {
+                        r.images.entry(image.clone()).or_default().offline = offline;
+                        r.compact();
+                    })?;
+                    log.audit("net", &image, net_word(offline));
+                    offline
+                }
+            };
+            // What the running emulator was started with (the setting applies at start).
+            let now = emu::running(&procs, img).map(started_offline);
+            let note = match now {
+                Some(o) if o != offline => format!(
+                    "; running {} until restarted (aodm restart {image})",
+                    net_word(o)
+                ),
+                _ => String::new(),
+            };
+            out.line(
+                format!("{image}: {}{note}", net_word(offline)),
+                json!({"image": image, "ok": true, "offline": offline, "running_offline": now}),
+            );
         }
         ImageCmd::Show { image } => {
             let (images, procs, reg) = inventory(env, log)?;
@@ -660,6 +713,16 @@ fn image(c: ImageCmd, ctx: &Ctx, out: &mut Out, dry: bool) -> anyhow::Result<()>
     Ok(())
 }
 
+fn net_word(offline: bool) -> &'static str {
+    if offline { "offline" } else { "online" }
+}
+
+/// Whether a running emulator was started without a network (see `emu::args`).
+fn started_offline(p: &proc::EmuProc) -> bool {
+    std::fs::read(format!("/proc/{}/cmdline", p.pid))
+        .is_ok_and(|c| c.split(|b| *b == 0).any(|a| a == b"restrict=on"))
+}
+
 /// `aodm show NAME`.
 fn show(env: &Env, img: &avd::Image, procs: &[proc::EmuProc], reg: &Registry, out: &mut Out) {
     let running = emu::running(procs, img);
@@ -714,6 +777,7 @@ fn show(env: &Env, img: &avd::Image, procs: &[proc::EmuProc], reg: &Registry, ou
         ),
         ("device", img.device().into()),
         ("ram", img.ram().into()),
+        ("network", net_word(entry.offline).into()),
         ("groups", or_none(&entry.groups.join(", "))),
         ("tags", or_none(&tags.join(", "))),
         (
@@ -772,7 +836,7 @@ fn show(env: &Env, img: &avd::Image, procs: &[proc::EmuProc], reg: &Registry, ou
             "problem": img.problem, "folder": img.dir, "ini": img.ini_path,
             "bytes": size, "api": img.api(), "abi": img.abi(), "tag": img.tag(),
             "sysdir": img.sysdir(), "sysimg_revision": rev, "device": img.device(),
-            "ram": img.ram(), "groups": entry.groups, "tags": entry.tags,
+            "ram": img.ram(), "offline": entry.offline, "groups": entry.groups, "tags": entry.tags,
             "port": entry.port, "template": entry.template, "origin": entry.origin,
             "saves": saves_json, "emulator_log": emu_log, "last_start": last_start,
             "config": config,

@@ -27,6 +27,10 @@ pub struct Entry {
     /// Where it came from, e.g. `adx_api37@20261106-120000-clean` for an opened save.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<String>,
+    /// Started without a network (`aodm net IMAGE offline`): the emulator gives the phone
+    /// no route out, so nothing on the phone has to change.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
     /// Unknown keys, preserved.
     #[serde(flatten)]
     pub extra: toml::Table,
@@ -123,6 +127,10 @@ impl Registry {
         self.images.get(image)
     }
 
+    pub fn offline(&self, image: &str) -> bool {
+        self.entry(image).is_some_and(|e| e.offline)
+    }
+
     pub fn groups(&self, image: &str) -> &[String] {
         self.entry(image)
             .map(|e| e.groups.as_slice())
@@ -174,6 +182,21 @@ pub fn validate_value(s: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offline_round_trips_and_survives_compact() {
+        let dir = tempfile::tempdir().unwrap();
+        Registry::update(dir.path(), |r| {
+            r.images.entry("a.b".into()).or_default().offline = true;
+            r.images.entry("c".into()).or_default().offline = false;
+            r.compact();
+        })
+        .unwrap();
+        let text = std::fs::read_to_string(Registry::path(dir.path())).unwrap();
+        assert!(text.contains("[images.\"a.b\"]\noffline = true"), "{text}");
+        let r = Registry::load(dir.path()).unwrap();
+        assert!(r.offline("a.b") && !r.offline("c") && !r.images.contains_key("c"));
+    }
 
     #[test]
     fn missing_file_is_empty() {

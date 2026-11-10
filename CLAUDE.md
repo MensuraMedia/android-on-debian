@@ -40,5 +40,6 @@ Read `README.md`, `docs/architecture.md` and `HANDOFF.md` first.
 | Provision | `./adx up [profile]` |
 | New app | `./adx app-template new <Name> <package> [dir]` |
 | Emulator | `./adx emulator start [--window] [--wipe]`, `stop`, `status`, `autoconfig`, `desktop`, `screenshot`, `accel` |
-| Logs | `./adx logs [adx\|emulator\|dir] [-n N]` (files in `~/.local/state/adx/`) |
+| App pipeline | `./adx pipeline run <App> [--serial S] [--stages build,check,test,deploy,smoke]`, `last <App> [--json]`, `list <App>` |
+| Logs | `./adx logs [adx\|emulator\|logcat\|dir] [-n N]` (files in `~/.local/state/adx/`) |
 | Machine report | `./adx env` |

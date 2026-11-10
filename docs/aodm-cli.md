@@ -176,6 +176,7 @@ the next command removes.
 | `aodm delete NAME` | remove image and registry entry; saves kept | `--yes` | done |
 | `aodm move NAME DIR` | move an image's folder to another disk (rewrites `path=`) | | P6 |
 | `aodm wipe NAME` | factory-reset user data (same as `start --wipe`, without booting): removes user data, cache, encryption key and snapshots; keeps config and identity | `--yes`, `--dry-run` | done |
+| `aodm net NAME [online\|offline]` | network from the next start: `offline` restricts the emulator's user-mode network (`restrict=on`), so the phone reaches neither the internet nor the host at 10.0.2.2, with nothing changed inside the phone; adb, the emulator console and the window keep working. Without a mode: the setting, and how a running phone was started. Clones of an offline phone are offline | `--json` | done |
 | `aodm image …` | the commands of this table, grouped (`aodm image start` = `aodm start`) | | done |
 | `aodm tui` | full-screen dashboard (also: `aodm` with no arguments on a terminal) | | P8 |
 
@@ -306,10 +307,10 @@ stay awake, location, battery, network; over adb while running).
 | `aodm config unset KEY` | back to the default | done |
 | `aodm config validate` | check every key (types, ranges, absolute paths, port slots) | done |
 | `aodm config path` | which files are read, in which order | done |
-| `aodm logs [-n N] [--follow] [--image NAME] [--level warn]` | aodm's lines from `adx.log` (all rotated generations), or an image's emulator log; `--follow` stops at Ctrl-C or, like `tail -f`, at the next line after the reader closes | done |
+| `aodm logs [-n N] [--follow] [--image NAME [--logcat]] [--level warn]` | aodm's lines from `adx.log` (all rotated generations), or an image's emulator log, or with `--logcat` its logcat (`logcat-NAME.log`, saved from every start, `-v threadtime`, this run's lines only); `--follow` stops at Ctrl-C or, like `tail -f`, at the next line after the reader closes | done |
 | `aodm audit [--since DATE] [--image NAME]` | changes only (save, restore, open, pin, delete, clone, rename, wipe, group/tag, config set/unset, gc; later apply, unlock…), with when, who and what; recorded from P5 on | done |
 | `aodm disk` | space per image, per image's saves, free per filesystem, leftovers | done |
-| `aodm gc [--dry-run]` | remove leftover work folders and temp files of dead runs, empty per-image save folders, and adx's rotated logs (`adx.log.N`, `emulator-*.log.N`) beyond `ADX_LOG_KEEP`; each item is re-checked just before removal; no prompt (it only removes aodm's own garbage), audited | done |
+| `aodm gc [--dry-run]` | remove leftover work folders and temp files of dead runs, empty per-image save folders, and adx's rotated logs (`adx.log.N`, `emulator-*.log.N`, `logcat-*.log.N`) beyond `ADX_LOG_KEEP`; each item is re-checked just before removal; no prompt (it only removes aodm's own garbage), audited | done |
 | `aodm completion bash\|zsh\|fish` | shell completion script | done |
 | `aodm help [COMMAND]` / `--help` | help | done |
 | `adx devices install` / `status` / `remove` | build and install, check, uninstall aodm | done |
@@ -343,7 +344,7 @@ the process environment for keys left unset there, then built-in fallbacks.
 | `ADX_EMU_HEADLESS` | `true` | no window unless `--window` |
 | `ADX_EMU_ENV` | (empty) | `VAR=value` pairs for the emulator process |
 | `ADX_EMU_BOOT_TIMEOUT` | `240` | seconds |
-| `ADX_LOG_DIR` | `~/.local/state/adx` | `adx.log` and emulator logs |
+| `ADX_LOG_DIR` | `~/.local/state/adx` | `adx.log`, emulator logs and logcat per image |
 | `ADX_LOG_MAX_KB` / `ADX_LOG_KEEP` | `5120` / `5` | log rotation |
 
 Per-image settings live in the registry (`$ADX_AOD_HOME/images.toml`:

@@ -3,13 +3,16 @@
 
 Pages: Images (emulator phones via aodm, SDK system images), Apps (render, run,
 open), Modules (adx list, install, doctor), Skills, Activity (jobs + adx.log)
-and Settings. Binds to 127.0.0.1. Reads are free; every action is a POST that
+and Settings. Binds to ADX_CONSOLE_HOST (127.0.0.2: emulator phones reach the
+host's 127.0.0.1 as 10.0.2.2, and a phone app can fake the Host header). Reads are free; every action is a POST that
 needs a same-origin request and the per-process token, and runs as a job whose
 output goes to a log file.
 
 Started by `adx console start` (which passes the configuration in the
 environment); run directly with:  python3 tools/console/server.py
 """
+import fcntl
+import glob
 import json
 import os
 import re
@@ -32,9 +35,13 @@ ADX = os.path.join(ADX_ROOT, "adx")
 APPS_DIR = os.environ.get("ADX_APPS_DIR") or os.path.expanduser("~/projects/android-apps")
 LOG_DIR = os.environ.get("ADX_LOG_DIR") or os.path.expanduser("~/.local/state/adx")
 JOB_DIR = os.path.join(LOG_DIR, "console")
+PIPE_DIR = os.environ.get("ADX_PIPELINE_DIR") or os.path.expanduser("~/.local/share/adx/pipeline")
+RUN_ID_RE = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
+RUN_FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$")
 ANDROID_HOME = os.environ.get("ANDROID_HOME") or os.path.expanduser("~/Android/Sdk")
 AVD_HOME = os.environ.get("ANDROID_AVD_HOME") or os.path.expanduser("~/.android/avd")
-HOST = "127.0.0.1"
+HOST = os.environ.get("ADX_CONSOLE_HOST") or "127.0.0.2"
+LOCAL = {HOST, "localhost"}
 PORT = int(os.environ.get("ADX_CONSOLE_PORT") or "8766")
 TOKEN = secrets.token_urlsafe(24)
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -154,6 +161,50 @@ def busy(kind, target):
 
 
 # -------------------------------------------------------------- images ---
+def started_offline():
+    """Images whose running emulator was started without a network (aodm net ... offline)."""
+    _code, out = run(["pgrep", "-a", "qemu-system"], timeout=10)
+    names = set()
+    for line in out.splitlines():
+        args = line.split()
+        if "restrict=on" in args and "-avd" in args[:-1]:
+            names.add(args[args.index("-avd") + 1])
+    return names
+
+
+def logcat_path(image, run=0):
+    """The phone's logcat that aodm saves from every start; run N is the Nth previous start."""
+    return os.path.join(LOG_DIR, f"logcat-{image}.log" + (f".{run}" if run else ""))
+
+
+LOGCAT_WINDOW = 8 * 1024 * 1024
+
+
+def logcat_view(image, run, n, q):
+    if not IMAGE_NAME_RE.match(image):
+        return 400, {"ok": False, "reason": "bad image name"}
+    base = logcat_path(image)
+    runs = sorted(int(f.rsplit(".", 1)[1]) if f != base else 0 for f in glob.glob(glob.escape(base) + "*")
+                  if f == base or re.fullmatch(r"\.\d+", f[len(base):]))
+    path = logcat_path(image, run)
+    if run not in runs:
+        return 200, {"ok": True, "path": path, "runs": runs, "lines": [], "total": 0}
+    with open(path, "rb") as fh:   # the last 8 MB only: a run can grow ~4 MB an hour
+        fh.seek(0, 2)
+        size = fh.tell()
+        fh.seek(max(0, size - LOGCAT_WINDOW))
+        lines = fh.read().decode("utf-8", "replace").splitlines()
+    if size > LOGCAT_WINDOW:
+        lines = lines[1:]   # the first line is cut
+    total = len(lines)
+    if q:
+        q = q.lower()
+        lines = [ln for ln in lines if q in ln.lower()]
+    return 200, {"ok": True, "path": path, "runs": runs, "total": total, "matched": len(lines),
+                 "window": size > LOGCAT_WINDOW,
+                 "lines": lines[-n:], "modified": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(path)))}
+
+
 def emulator_phones():
     code, out = run([aodm(), "list", "--json"], timeout=30)
     try:
@@ -161,6 +212,7 @@ def emulator_phones():
     except ValueError:
         rows = []
     phones = []
+    off_now = started_offline()
     for r in rows:
         name = r.get("name", "")
         cfg = read_props(os.path.join(AVD_HOME, f"{name}.avd", "config.ini"))
@@ -175,7 +227,8 @@ def emulator_phones():
             "groups": r.get("groups", ""), "state": state, "running": state.startswith("running"),
             "screen": f'{cfg.get("hw.lcd.width", "?")}×{cfg.get("hw.lcd.height", "?")}',
             "keyboard": cfg.get("hw.keyboard", ""),
-            "busy": next((k for k in ("start", "stop", "save", "clone", "rename") if busy(k, name)), ""),
+            "offline": bool(r.get("offline")), "running_offline": name in off_now,
+            "busy": next((k for k in ("start", "stop", "restart", "save", "clone", "rename") if busy(k, name)), ""),
         })
     return phones, (code == 0)
 
@@ -247,11 +300,15 @@ def act_asset(kind, action, body):
 
 
 def internet_state():
-    """Per running emulator: is its internet on (airplane mode off)? Read-only."""
+    """Per running emulator: is its internet on (airplane mode off, not started offline)? Read-only."""
     out = []
+    off_now = started_offline()
     for p in running_emulators():
+        if p["name"] in off_now:   # no network at all, whatever airplane mode says
+            out.append({**p, "internet": "off", "offline_mode": True})
+            continue
         _c, mode = run([adb(), "-s", p["serial"], "shell", "cmd", "connectivity", "airplane-mode"], timeout=10)
-        out.append({**p, "internet": "off" if mode.strip() == "enabled" else "on"})
+        out.append({**p, "internet": "off" if mode.strip() == "enabled" else "on", "offline_mode": False})
     return out
 
 
@@ -260,9 +317,11 @@ def act_internet(body):
     state = str(body.get("state", ""))
     if state not in ("on", "off"):
         return 400, {"ok": False, "reason": "state: on or off"}
-    phones = running_emulators()
+    off_now = started_offline()
+    phones = [p for p in running_emulators() if p["name"] not in off_now]   # those have no network to switch
     if not phones:
-        return 400, {"ok": False, "reason": "no emulator phone is running"}
+        return 400, {"ok": False, "reason": "no emulator phone with a network is running"
+                     + (" (started offline: Images, Go online)" if off_now else "")}
 
     def fn(log):
         for p in phones:
@@ -387,9 +446,49 @@ def apps():
             "skills": sorted(s for s in os.listdir(skills) if os.path.isdir(os.path.join(skills, s)))
                       if os.path.isdir(skills) else [],
             "has_claude_md": os.path.isfile(os.path.join(root, "CLAUDE.md")),
-            "busy": next((k for k in ("render", "run") if busy(k, d)), ""),
+            "last_run": (pipeline_runs(d, 1) or [None])[0],
+            "busy": next((k for k in ("pipeline", "render") if busy(k, d)), ""),
         })
     return out
+
+
+# ------------------------------------------------------------ pipeline ---
+# Runs are written by `adx pipeline run` (tools/pipeline/pipeline.py): one folder per run
+# with run.json (rewritten after every stage, so it shows progress), summary.md, logs, evidence.
+def pipeline_idle(d):
+    """No run of this app is in progress (the pipeline holds <app>/.lock while it runs)."""
+    try:
+        with open(os.path.join(d, ".lock"), "a") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+    except OSError:
+        return False
+
+
+def pipeline_runs(app, limit=50):
+    d = os.path.join(PIPE_DIR, app)
+    out = []
+    for rid in sorted((r for r in (os.listdir(d) if os.path.isdir(d) else []) if RUN_ID_RE.match(r)), reverse=True):
+        try:   # a run can be pruned or half-written while we read
+            with open(os.path.join(d, rid, "run.json"), encoding="utf-8") as fh:
+                run = json.load(fh)
+            run["files"] = sorted(f for f in os.listdir(os.path.join(d, rid)) if RUN_FILE_RE.match(f))
+        except (OSError, ValueError):
+            continue
+        if run.get("status") == "running" and pipeline_idle(d):
+            run["status"] = "interrupted"   # its process died without recording the end
+        out.append(run)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def run_file(app, rid, name):
+    """Path of a file of a pipeline run, or None (names only, never a path)."""
+    if app not in app_dirs() or not RUN_ID_RE.match(rid) or not RUN_FILE_RE.match(name):
+        return None
+    path = os.path.join(PIPE_DIR, app, rid, name)
+    return path if os.path.isfile(path) and not os.path.islink(path) else None
 
 
 # ------------------------------------------------------------- modules ---
@@ -470,8 +569,17 @@ def act_image(name, action, body=None):
             # the image's captures folder follows it (a duplicate starts with an empty one)
             cmd = ["bash", "-c", 'aodm_bin=$1; shift; "$aodm_bin" rename "$1" "$2" && mv -- "$3" "$4"',
                    "rename", aodm(), name, new, old_c, new_c]
+    elif action == "net":
+        offline = (body or {}).get("offline")
+        if not isinstance(offline, bool):
+            return 400, {"ok": False, "reason": "offline: true or false"}
+        # synchronous, so a restart asked right after sees the new setting
+        mode = "offline" if offline else "online"
+        res = sync_job("net", name, lambda log: log.run([aodm(), "net", name, mode], timeout=30))
+        return (200 if res["ok"] else 500), res
     else:
         cmd = {"start": [aodm(), "start", name, "--window"],
+               "restart": [aodm(), "restart", name, "--window"],
                "stop": [aodm(), "stop", name],
                "save": [aodm(), "save", "create", name]}.get(action)
     if not cmd:
@@ -480,19 +588,40 @@ def act_image(name, action, body=None):
     return 200, {"ok": True, "job": job["id"], "new": new}
 
 
-def act_app(name, action):
+APP_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+PACKAGE_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+# Java/Kotlin keywords can't be package segments (the generated sources wouldn't compile).
+KEYWORDS = set("""abstract as assert boolean break byte case catch char class const continue default do double
+else enum extends false final finally float for fun goto if implements import in instanceof int interface is
+long native new null object package private protected public return short static strictfp super switch
+synchronized this throw throws transient true try typealias typeof val var void volatile when while""".split())
+
+
+def act_new_app(body):
+    name, pkg = str(body.get("name", "")).strip(), str(body.get("package", "")).strip()
+    if not APP_NAME_RE.match(name):
+        return 400, {"ok": False, "reason": "name: letters and digits, starting with a letter"}
+    if not PACKAGE_RE.match(pkg):
+        return 400, {"ok": False, "reason": "package: like com.example.myapp (lower case)"}
+    if KEYWORDS & set(pkg.split(".")):
+        return 400, {"ok": False, "reason": f"package: {', '.join(sorted(KEYWORDS & set(pkg.split('.'))))} is a Java/Kotlin keyword"}
+    if os.path.exists(os.path.join(APPS_DIR, name)):
+        return 400, {"ok": False, "reason": f"{name} already exists in {APPS_DIR}"}
+    job, new = start_job("new", name, [ADX, "app-template", "new", name, pkg])
+    return 200, {"ok": True, "job": job["id"], "new": new}
+
+
+def act_app(name, action, body=None):
     if name not in app_dirs():
         return 404, {"ok": False, "reason": "unknown app"}
     root = os.path.join(APPS_DIR, name)
-    if action == "render":
+    if action == "pipeline":
+        serial = str((body or {}).get("serial") or "")
+        if serial and not assets.SERIAL_RE.match(serial):
+            return 400, {"ok": False, "reason": "bad serial"}
+        job, new = start_job("pipeline", name, [ADX, "pipeline", "run", name] + (["--serial", serial] if serial else []))
+    elif action == "render":
         job, new = start_job("render", name, ["./gradlew", "recordRoborazziDebug"], cwd=root)
-    elif action == "run":
-        pkg = app_package(name)
-        if not pkg:
-            return 400, {"ok": False, "reason": "no applicationId in app/build.gradle.kts"}
-        script = ('./gradlew installDebug && "$1" shell monkey -p "$2" '
-                  '-c android.intent.category.LAUNCHER 1')
-        job, new = start_job("run", name, ["bash", "-c", script, "run", adb(), pkg], cwd=root)
     elif action == "open":
         job, new = start_job("open", name, ["xdg-open", root])
     else:
@@ -543,13 +672,13 @@ class Handler(BaseHTTPRequestHandler):
     def host_ok(self):
         """Refuse other Host names (DNS rebinding)."""
         host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
-        return host in ("127.0.0.1", "localhost", "::1")
+        return host in LOCAL
 
     def origin_ok(self):
         origin = self.headers.get("Origin") or self.headers.get("Referer")
         if not origin:
             return True
-        return (urlparse(origin).hostname or "").lower() in ("127.0.0.1", "localhost", "::1")
+        return (urlparse(origin).hostname or "").lower() in LOCAL
 
     def file(self, path):
         try:
@@ -597,6 +726,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, assets_view((q.get("serial") or [""])[0]))
         if path == "/api/internet":
             return self.send(200, {"phones": internet_state()})
+        if path == "/api/logcat":
+            try:
+                run_n = int((q.get("run") or ["0"])[0])
+                n = min(max(int((q.get("n") or ["500"])[0]), 1), 5000)
+            except ValueError:
+                return self.send(400, {"ok": False, "reason": "run and n are numbers"})
+            code, res = logcat_view((q.get("image") or [""])[0], run_n, n, (q.get("q") or [""])[0][:200])
+            return self.send(code, res)
         if path == "/api/captures":
             return self.send(200, {"captures": assets.captures(), "recording": assets.recordings(),
                                    "dir": assets.CAPTURES_DIR, "limit": assets.REC_LIMIT})
@@ -617,6 +754,18 @@ class Handler(BaseHTTPRequestHandler):
             if not assets.valid_file(kind, name):
                 return self.send(404, {"error": "not found"})
             return self.file(os.path.join(assets.kind_dir(kind), name))
+        m = re.match(r"^/api/apps/([^/]+)/runs$", path)
+        if m and m.group(1) in app_dirs():
+            return self.send(200, {"runs": pipeline_runs(m.group(1)), "dir": os.path.join(PIPE_DIR, m.group(1))})
+        m = re.match(r"^/api/apps/([^/]+)/runs/([^/]+)/([^/]+)$", path)
+        if m:
+            f = run_file(*m.groups())
+            if not f:
+                return self.send(404, {"error": "not found"})
+            if f.lower().endswith(".png"):
+                return self.file(f)
+            with open(f, "rb") as fh:   # anything else only as text: an app's build could drop .html/.svg here
+                return self.send(200, fh.read(), "text/plain; charset=utf-8")
         m = re.match(r"^/api/apps/([^/]+)/shots$", path)
         if m and m.group(1) in app_dirs():
             return self.send(200, {"shots": app_shots(m.group(1))[1]})
@@ -660,14 +809,20 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/phone/feature":
             code, res = act_feature(body)
             return self.send(code, res)
+        if path == "/api/apps-new":
+            code, res = act_new_app(body)
+            return self.send(code, res)
         m = re.match(r"^/api/(images|apps|modules)/([^/]+)/([a-z]+)$", path)
         if m and NAME_RE.match(m.group(2)):
             kind, name, action = m.groups()
             if kind == "images":
                 code, res = act_image(name, action, body)
             else:
-                code, res = {"apps": act_app, "modules": act_module}[kind](name, action)
+                code, res = act_app(name, action, body) if kind == "apps" else act_module(name, action)
             return self.send(code, res)
+        if path == "/api/logcat/open":   # the log folder (logcat-NAME.log of every image)
+            job, _new = start_job("open", "logs", ["xdg-open", LOG_DIR])
+            return self.send(200, {"ok": True, "job": job["id"]})
         if path == "/api/system-images/open":
             code, res = act_open_sysimage(str(body.get("path", "")))
             return self.send(code, res)

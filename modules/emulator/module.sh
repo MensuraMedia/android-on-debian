@@ -4,6 +4,37 @@ _emu()  { "$ANDROID_HOME/emulator/emulator" "$@"; }
 _adb()  { "$ANDROID_HOME/platform-tools/adb" "$@"; }
 _avdm() { JAVA_HOME="$ADX_JAVA_HOME" "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$@"; }
 _log()  { echo "$ADX_LOG_DIR/emulator-$ADX_AVD_NAME.log"; }
+_logcat_log() { echo "$ADX_LOG_DIR/logcat-$ADX_AVD_NAME.log"; }
+# The AVD's network setting in aodm's registry (aodm net NAME offline|online; the console's
+# Go offline). Offline: the emulator gives the phone no route out, nothing changes inside it.
+# aodm reads its own registry; without aodm, a plain parse of what aodm writes.
+_offline() {
+  local aodm out; aodm="$(command -v aodm || echo "$HOME/.local/bin/aodm")"
+  if [ -x "$aodm" ] && out="$("$aodm" --json net "$ADX_AVD_NAME" 2>/dev/null)"; then
+    grep -q '"offline": *true' <<<"$out"
+    return
+  fi
+  awk -v n="$ADX_AVD_NAME" '
+    { sub(/[ \t]*#.*/, "") }
+    /^\[/ { inside = ($0 == "[images." n "]" || $0 == "[images.\"" n "\"]" || $0 == "[images.'"'"'" n "'"'"']"); next }
+    inside && /^offline *= *true *$/ { found = 1 }
+    END { exit !found }' "$ADX_AOD_HOME/images.toml" 2>/dev/null
+}
+# The phone's logcat from this start on (a quick-boot snapshot keeps the last run's buffer),
+# rotated like the emulator log; ends with the emulator, gives up if adb never sees it.
+# Same as aodm (tools/aodm/crates/aod-core/src/emu.rs, logcat).
+_logcat_start() {
+  local since; since="$(date +%s)"
+  adx_log_shift "$(_logcat_log)"
+  # The whole group is redirected: a background list keeps its caller's stdout otherwise
+  # (adx emulator start | tail would wait for the phone to exit).
+  local adb="$ANDROID_HOME/platform-tools/adb" serial="emulator-$ADX_EMU_PORT"
+  { timeout "$ADX_EMU_BOOT_TIMEOUT" "$adb" -s "$serial" wait-for-device &&
+      exec "$adb" -s "$serial" logcat -v threadtime -T "$since.000"; } \
+    >"$(_logcat_log)" 2>&1 </dev/null &
+  disown
+  adx_log "logcat to $(_logcat_log)"
+}
 # PID of this AVD's emulator process, if one is running.
 _pid()  { pgrep -f "qemu-system-[^ ]* .*-avd $ADX_AVD_NAME( |\$)" | head -1; }
 # This AVD's adb serial if adb sees it (console port pinned by ADX_EMU_PORT).
@@ -123,6 +154,11 @@ mod_start() {
   # adx_die exits this module subshell; report failures to the desktop too.
   trap 'rc=$?; if [ $rc -ne 0 ]; then [ -n "${_ADX_EMU_PID:-}" ] && kill "$_ADX_EMU_PID" 2>/dev/null; _notify "Failed to start (exit $rc). See: adx logs emulator"; fi' EXIT
   if [ "$window" = false ] && [ "$ADX_EMU_HEADLESS" = true ]; then flags+=(-no-window -no-audio); fi
+  local net=online
+  if _offline; then   # same flags as aodm (tools/aodm/crates/aod-core/src/emu.rs, args)
+    net=offline
+    flags+=(-feature -WiFiPacketStream -wifi-user-mode-options restrict=on -network-user-mode-options restrict=on)
+  fi
 
   if [ -n "$(_pid)" ]; then
     if [ -n "$(_serial)" ]; then
@@ -134,11 +170,12 @@ mod_start() {
     _adb start-server >/dev/null 2>&1
     local i; for i in $(seq 1 15); do [ -n "$(_serial)" ] && break; sleep 1; done
     [ -n "$(_serial)" ] || adx_die "adb still sees no device; run: adx emulator stop, then start again"
+    _logcat_start   # the adb restart ended every capture; this phone's resumes
     adx_log "reattached to $(_serial)"; _notify "Reattached to running emulator"; return 0
   fi
   mkdir -p "$ADX_LOG_DIR"
   adx_log_shift "$(_log)"   # keep the previous run's log (crash evidence) as .1
-  adx_log "starting $ADX_AVD_NAME (gpu: $ADX_EMU_GPU, window: $window, log: $(_log))"
+  adx_log "starting $ADX_AVD_NAME (gpu: $ADX_EMU_GPU, window: $window, network: $net, log: $(_log))"
   local t0=$SECONDS pid
   # ADX_EMU_ENV is a space-separated VAR=value list (no spaces inside values).
   local -a ev=(); read -ra ev <<<"$ADX_EMU_ENV"
@@ -146,6 +183,7 @@ mod_start() {
   nohup env "${ev[@]}" "$ANDROID_HOME/emulator/emulator" "${flags[@]}" >"$(_log)" 2>&1 &
   pid=$!
   _ADX_EMU_PID=$pid   # killed by the EXIT trap if start fails
+  _logcat_start
   # Poll instead of `adb wait-for-device` so a crashed emulator fails fast.
   until [ "$(_adb -s "emulator-$ADX_EMU_PORT" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
     kill -0 "$pid" 2>/dev/null || adx_die "emulator exited during boot — see $(_log); retry, or use --wipe if it keeps failing"

@@ -210,12 +210,13 @@ fn refuse_sandbox(sandbox: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `aodm logs`: aodm's lines from adx.log, or one image's emulator log.
+/// `aodm logs`: aodm's lines from adx.log, or one image's emulator log or logcat.
 pub fn logs(
     env: &Env,
     lines: usize,
     follow: bool,
     image: Option<&str>,
+    logcat: bool,
     level: Option<&str>,
     out: &mut Out,
 ) -> anyhow::Result<()> {
@@ -237,7 +238,11 @@ pub fn logs(
     let path = match image {
         Some(i) => {
             avd::validate_name(i)?;
-            emu::log_path(&dir, i)
+            if logcat {
+                emu::logcat_path(&dir, i)
+            } else {
+                emu::log_path(&dir, i)
+            }
         }
         None => dir.join("adx.log"),
     };
@@ -255,12 +260,14 @@ pub fn logs(
         }
     };
     let all: Vec<String> = match image {
-        // The emulator log of the current run (previous runs are emulator-NAME.log.N).
-        Some(_) => std::fs::read_to_string(&path)
-            .map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?
-            .lines()
-            .map(str::to_string)
-            .collect(),
+        // The current run's log (previous runs are emulator-NAME.log.N, logcat-NAME.log.N).
+        // Lossy: logcat passes app bytes through, not always valid UTF-8.
+        Some(_) => String::from_utf8_lossy(
+            &std::fs::read(&path).map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?,
+        )
+        .lines()
+        .map(str::to_string)
+        .collect(),
         None => log::read_all(&path),
     };
     let picked: Vec<&String> = all.iter().filter(|l| keep(l)).collect();
