@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-07 (v0.2.0 released; branch `feat/aodm` at P5a)
+# Handoff — updated 2026-11-09 (v0.2.0 released; `feat/aodm` merged into `main`; adx console)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -9,7 +9,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 | Area | Status |
 | --- | --- |
-| Framework | 15 modules (`./adx list`); `./adx up` idempotent and `./adx doctor` exit 0 on the hybrid-GPU laptop (Mint 22.2). `studio` is optional and not in any profile |
+| Framework | 17 modules (`./adx list`, all ok on 2026-11-09); `./adx up` idempotent and `./adx doctor` exit 0 on the hybrid-GPU laptop (Mint 22.3). `studio` is optional and not in any profile. New AVDs get `hw.keyboard=yes` (`ADX_AVD_HW_KEYBOARD`) so the host keyboard types into the emulator |
 | Render loop (Roborazzi) | Verified; app baselines now committed in `app/src/test/screenshots/` |
 | Live loop (emulator + adb) | Verified: `adx emulator start --window`, install, launch, location via `adb emu geo fix` |
 | mobile-mcp | Verified from a live Claude Code session (list devices/elements, tap, screenshot) |
@@ -17,18 +17,26 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Claude integration | Global rules + `adversarial-reviewer` agent via `claude-rules`; mobile-mcp pinned 1.0.16 |
 | Example app | `~/projects/android-apps/HelloAdx`: weather app with live Open-Meteo data (own HANDOFF) |
 | Review | Three adversarial reviews (installer, app/template, docs/Claude) on 2026-11-06; fixes are in 0.2.0, open items below |
-| Phone image manager | Branch `feat/aodm` (P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
-| Web console | `adx console start` (menu: adx console) → http://127.0.0.1:8766: Images (aodm Launch/Stop/Save, system images), Assets (folders + top 10 phone features; every feature tested against the API 37 emulator, then reset), Apps (Render/Run/Open, screenshot gallery), Modules (Install, doctor), Skills, Activity, Settings. Verified by clicking every page in headless Chromium (no page errors), Doctor and Launch jobs ran; not yet adversarially reviewed. Server log `~/.local/state/adx/console.log`, job logs `~/.local/state/adx/console/` |
+| Phone image manager | On `main` (merged from `feat/aodm`, P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
+| Web console | `adx console start` (menu: adx console, own icon in menu/panel/Alt+Tab) → http://127.0.0.1:8766, Python stdlib only. Images: aodm Launch/Stop, Save, Duplicate (clone), Rename, plus per-phone Screenshot, Record (≤180 s) and Captures gallery (`~/.local/share/adx/assets/captures/<image>/`); system images. Assets: upload folders (wallpapers, photos & videos, sounds, APKs) + top 10 phone features. Sidebar: Internet switch (airplane mode, ping-checked). Apps (Render/Run/Open, screenshot gallery), Modules (Install, doctor), Skills, Activity, Settings. Every page and action verified in headless Chromium and against the API 37 emulator (phone state reset afterwards); **not yet adversarially reviewed**. Server log `~/.local/state/adx/console.log`, job logs `~/.local/state/adx/console/` |
+| Security | Posture measured and written up in [docs/security.md](docs/security.md) (2026-11-09): no inbound path from the internet (NAT, loopback-only ports, ufw on); test-device weaknesses accepted by decision; one open finding in LinSmartPhone (separate repo, not fixed here) |
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
-| Push | `feat/aodm` is local only: the GitHub token lacks the `workflow` scope (the branch changes `.github/workflows/`). Fix: `gh auth refresh -h github.com -s workflow`, then `git push -u origin feat/aodm` |
+| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `8894b30`); `feat/aodm` merged (`4b5f242`) and can be deleted |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
 ## This machine (hybrid-GPU laptop)
 
-- `config/local.env`: `ADX_EMU_ENV` (NVIDIA offload) and `ADX_EMU_GPU="software"`;
-  `-gpu host` crashed twice within minutes (GL `null ctx`).
+- `config/local.env` has no overrides now: the emulator runs `-gpu host` and
+  was stable all through 2026-11-09. (On 2026-11-06 `-gpu host` crashed twice
+  with GL `null ctx`; if that returns, `adx emulator autoconfig` sets
+  `ADX_EMU_GPU=software`.)
 - User is in the `kvm` group but this login predates it: log out and back in once.
-- Menu entry installed (`adx emulator desktop`).
+- Menu entries installed: Android Emulator (`adx emulator desktop`), Phone
+  Images (`aod-gui`), adx console.
+- `adx_api37` baseline save: `20261110-012304Z-baseline` (8.7 GB, pinned,
+  verified). `aodm save restore adx_api37 20261110-012304Z-baseline` returns
+  the phone to it.
+- Emulator GPS location was left at Paris (48.85, 2.35) by a console test.
 
 ## Known issues
 
@@ -40,7 +48,21 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   - Thumbnails are not counted by `aodm disk`; `gc` removes orphans only while at least one image exists.
   - Busy state clears when `aodm` returns; the card's new state shows on the next list (≤3 s).
 
-- `feat/aodm` isn't pushed: the token lacks the `workflow` scope (see State).
+- adx console, recorded rather than fixed:
+  - Not yet adversarially reviewed (installer, server, page).
+  - Chromium hands the window manager only a 16×16 favicon; the panel and
+    Alt+Tab use the menu entry's theme icon (matched by `StartupWMClass`), so
+    they look right, but a WM that only uses the window's own icon would scale up 16 px.
+  - Screen recordings stop at 180 s (Android's `screenrecord` limit); one
+    recording per phone at a time; a recording in progress is lost if the
+    console server stops.
+  - Set wallpaper opens the phone's own preview (Photos' SetWallpaperActivity);
+    the user confirms on the phone: Android has no adb command to set one.
+  - Recording state and demo-mode state live in the server's memory only.
+- Phone logs (logcat: app logs, crashes, ANRs) aren't kept anywhere; only the
+  emulator process log per image, `adx.log` and console job logs are.
+- The emulator's side toolbar can stay behind on another workspace when the
+  phone window moves; dragging the phone window re-docks it.
 - `config/claude-global-rules.md` gained an `ANDROID_SERIAL` note (several
   emulators break plain `adb`); it reaches `~/.claude/CLAUDE.md` only after the
   owner runs `adx claude-rules install`.
@@ -73,6 +95,11 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Next steps
 
+0. adx console follow-ups: adversarial + deployment review; per-phone logcat
+   capture (`logs/<image>/`, crash/ANR extracts, viewer on each card) was
+   offered on 2026-11-09 and awaits the owner; optional security controls
+   from docs/security.md (filtering Private DNS, offline/filtered network
+   mode per image, `hw.audioInput=no`) only if the owner asks.
 1. **Phone image manager (Rust)** on branch `feat/aodm`: plan approved; P0
    (spike) and P1 (gate, devtools, rust, agents, workflow, CI, workspace core)
    done and reviewed (30 findings fixed); P2 (inventory, process detection,
@@ -109,6 +136,13 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
 
+- 2026-11-09: the adx console (web GUI) is the OS/phone image manager the
+  owner uses day to day; it owns the new app icon. `aod-gui` keeps its
+  generic `phone` icon. LineageOS/phone-conversion features stay in
+  LinSmartPhone (`~/projects/android-conversion`) and are not part of this repo.
+- 2026-11-09: security: document the posture; don't change anything already
+  sufficient. The LinSmartPhone token exposure is recorded in
+  docs/security.md, not fixed from here.
 - 2026-11-07: the planned aodm manager (P8 terminal dashboard, P10 desktop
   window) is the manager to use. The P10a "Phone Images" window is its
   prototype: its thumbnail card grid becomes the manager's main view, built

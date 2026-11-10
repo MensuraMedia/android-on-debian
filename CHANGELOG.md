@@ -9,6 +9,17 @@ the project uses [Semantic Versioning](https://semver.org/).
 Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 
 ### Upgrading from 0.2.0
+- `./adx up` now also runs the `console` module (default profile): it installs
+  the "adx console" menu entry and its icon (`~/.local/share/icons/hicolor/*/apps/adx-console.*`);
+  nothing is downloaded (Python standard library). `adx console start` serves
+  http://127.0.0.1:8766 (`ADX_CONSOLE_PORT`). The console creates
+  `~/.local/share/adx/assets/` (your uploads and per-phone captures, see
+  `ADX_CONSOLE_ASSETS_DIR`, `ADX_CONSOLE_UPLOAD_MAX_MB`) and job logs in
+  `~/.local/state/adx/console/` only when used. Rolling back: `adx console
+  remove` (stops it, removes its menu entry and icon), then delete those
+  folders if unwanted.
+- Existing AVDs get `hw.keyboard=yes` the next time `adx emulator install`
+  (or `create`) runs; it applies from the phone's next start.
 - `./adx up` now installs `rust` (rustup toolchain 1.95.0, a few hundred MB;
   an existing rustup is reused) and `devtools` (ShellCheck, cargo-deny), fetches
   the `diagram-design` skill and installs the `deploy-reviewer` agent: it needs
