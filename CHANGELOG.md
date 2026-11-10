@@ -86,6 +86,25 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 - Remaining technical document sections and diagrams.
 
 ### Added
+- `docs/security.md`: the measured security posture of the emulator phones
+  and the tools around them (image, network exposure, host, data at rest,
+  console and agents), the controls available, and one open finding in the
+  separate LinSmartPhone project (documented, not changed here).
+- Console sidebar **Internet** switch: cuts or restores the internet of every
+  running emulator phone (airplane mode), then checks it with a ping;
+  red Wi-Fi-off icon and "Internet: off" while cut (`GET|POST /api/internet`).
+- Captures per phone image: **Screenshot** and **Record** (screen recording,
+  up to 180 s, Stop saves it) on each phone's card on the Images page and in
+  Assets feature 10, saved to `ADX_CONSOLE_ASSETS_DIR/captures/<image>/`
+  (`.png`, `.mp4`); **Captures** opens that phone's gallery (view, play,
+  delete, open folder). Renaming an image moves its captures folder; a
+  duplicate starts with an empty one. Replaces the shared Screenshots folder.
+- Console Images page: **Duplicate** (`aodm clone`) and **Rename** (`aodm
+  rename`) per phone image, with a name dialog that checks the name (letters,
+  digits, `. _ -`) and refuses names already in use; both need a stopped image.
+  Actions are now one minimal icon toolbar (Launch/Stop, Save, Duplicate,
+  Rename) with tooltips, and every card's specs are an even grid of labelled
+  values (label above value) instead of one long row.
 - adx console app icon (`tools/console/static/app-icon/`, SVG source + PNG
   16-512, `render-icons.sh`): `adx console install` puts it in the user's
   hicolor theme as `adx-console` for the menu entry; the page favicon gives

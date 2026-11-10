@@ -175,7 +175,7 @@ def emulator_phones():
             "groups": r.get("groups", ""), "state": state, "running": state.startswith("running"),
             "screen": f'{cfg.get("hw.lcd.width", "?")}×{cfg.get("hw.lcd.height", "?")}',
             "keyboard": cfg.get("hw.keyboard", ""),
-            "busy": next((k for k in ("start", "stop", "save") if busy(k, name)), ""),
+            "busy": next((k for k in ("start", "stop", "save", "clone", "rename") if busy(k, name)), ""),
         })
     return phones, (code == 0)
 
@@ -246,11 +246,80 @@ def act_asset(kind, action, body):
     return 200, sync_job(f"{action}-{kind}", target, fn)
 
 
+def internet_state():
+    """Per running emulator: is its internet on (airplane mode off)? Read-only."""
+    out = []
+    for p in running_emulators():
+        _c, mode = run([adb(), "-s", p["serial"], "shell", "cmd", "connectivity", "airplane-mode"], timeout=10)
+        out.append({**p, "internet": "off" if mode.strip() == "enabled" else "on"})
+    return out
+
+
+def act_internet(body):
+    """Cut (airplane mode on) or restore every running emulator's internet, then check it."""
+    state = str(body.get("state", ""))
+    if state not in ("on", "off"):
+        return 400, {"ok": False, "reason": "state: on or off"}
+    phones = running_emulators()
+    if not phones:
+        return 400, {"ok": False, "reason": "no emulator phone is running"}
+
+    def fn(log):
+        for p in phones:
+            # internet off = airplane mode on (cuts Wi-Fi and mobile data)
+            assets.feature(log, p["serial"], "airplane", "on" if state == "off" else "off")
+        time.sleep(4 if state == "on" else 2)   # the radio needs a moment to come back
+        for p in phones:
+            code, _out = assets.adb(log, p["serial"], "shell", "ping -c1 -W3 8.8.8.8 >/dev/null 2>&1",
+                                    check=False, timeout=15)
+            online = code == 0
+            log.note(f"{p['serial']}: internet {'reachable' if online else 'unreachable'}")
+            if online != (state == "on"):
+                log.fail(f"{p['serial']}: expected internet {state}")
+    return 200, sync_job(f"internet-{state}", ",".join(p["serial"] for p in phones), fn)
+
+
+def running_image(serial):
+    """Image name of a running emulator serial, or None."""
+    return next((p["name"] for p in running_emulators() if p["serial"] == serial), None)
+
+
 def act_feature(body):
     serial, name = str(body.get("serial", "")), str(body.get("name", ""))
-    if not assets.SERIAL_RE.match(serial) or serial not in {p["serial"] for p in running_emulators()}:
+    image = running_image(serial) if assets.SERIAL_RE.match(serial) else None
+    if not image:
         return 400, {"ok": False, "reason": "no running emulator phone with that serial"}
+    if name == "screenshot":   # saved in this phone image's own captures folder
+        return 200, sync_job("screenshot", image, lambda log: assets.screenshot(log, serial, image))
     return 200, sync_job(f"phone-{name}", serial, lambda log: assets.feature(log, serial, name, body.get("value")))
+
+
+def act_record(body):
+    serial, action = str(body.get("serial", "")), str(body.get("action", ""))
+    image = running_image(serial) if assets.SERIAL_RE.match(serial) else None
+    if not image:
+        return 400, {"ok": False, "reason": "no running emulator phone with that serial"}
+    if action == "start":
+        def saved(s):   # runs when screenrecord exits (Stop or the time limit)
+            sync_job("recording-saved", image, lambda log: assets.rec_finish(log, s))
+        return 200, sync_job("record-start", image, lambda log: assets.rec_start(log, serial, image, saved))
+    if action == "stop":
+        return 200, sync_job("record-stop", image, lambda log: assets.rec_stop(log, serial))
+    return 400, {"ok": False, "reason": "action: start or stop"}
+
+
+def act_capture(action, body):
+    image, name = str(body.get("image", "")), str(body.get("name", ""))
+    if not assets.IMAGE_RE.match(image):
+        return 400, {"ok": False, "reason": "bad image name"}
+    if action == "delete":
+        return (200, {"ok": True}) if assets.delete_capture(image, name) else (404, {"ok": False, "reason": "no such capture"})
+    if action == "open":
+        d = assets.capture_dir(image)
+        os.makedirs(d, exist_ok=True)
+        job, _new = start_job("open", image, ["xdg-open", d])
+        return 200, {"ok": True, "job": job["id"]}
+    return 404, {"ok": False, "reason": "unknown action"}
 
 
 def system_images():
@@ -380,13 +449,31 @@ def devices():
 
 
 # ------------------------------------------------------------- actions ---
-def act_image(name, action):
-    names = {p["name"] for p in emulator_phones()[0]}
-    if name not in names:
+IMAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def act_image(name, action, body=None):
+    phones = {p["name"]: p for p in emulator_phones()[0]}
+    if name not in phones:
         return 404, {"ok": False, "reason": "unknown image"}
-    cmd = {"start": [aodm(), "start", name, "--window"],
-           "stop": [aodm(), "stop", name],
-           "save": [aodm(), "save", "create", name]}.get(action)
+    if action in ("clone", "rename"):
+        new = str((body or {}).get("new", "")).strip()
+        if not IMAGE_NAME_RE.match(new):
+            return 400, {"ok": False, "reason": "name: letters, digits, . _ - (up to 64, starting with a letter or digit)"}
+        if new in phones:
+            return 400, {"ok": False, "reason": f"an image named {new} already exists"}
+        if phones[name]["running"]:
+            return 400, {"ok": False, "reason": "stop the phone first"}
+        cmd = [aodm(), action, name, new]
+        old_c, new_c = os.path.join(assets.CAPTURES_DIR, name), os.path.join(assets.CAPTURES_DIR, new)
+        if action == "rename" and os.path.isdir(old_c) and not os.path.exists(new_c):
+            # the image's captures folder follows it (a duplicate starts with an empty one)
+            cmd = ["bash", "-c", 'aodm_bin=$1; shift; "$aodm_bin" rename "$1" "$2" && mv -- "$3" "$4"',
+                   "rename", aodm(), name, new, old_c, new_c]
+    else:
+        cmd = {"start": [aodm(), "start", name, "--window"],
+               "stop": [aodm(), "stop", name],
+               "save": [aodm(), "save", "create", name]}.get(action)
     if not cmd:
         return 404, {"ok": False, "reason": "unknown action"}
     job, new = start_job(action, name, cmd)
@@ -508,6 +595,17 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(urlparse(self.path).query)
         if path == "/api/assets":
             return self.send(200, assets_view((q.get("serial") or [""])[0]))
+        if path == "/api/internet":
+            return self.send(200, {"phones": internet_state()})
+        if path == "/api/captures":
+            return self.send(200, {"captures": assets.captures(), "recording": assets.recordings(),
+                                   "dir": assets.CAPTURES_DIR, "limit": assets.REC_LIMIT})
+        m = re.match(r"^/api/captures/([^/]+)/([^/]+)$", path)
+        if m:
+            image, name = m.groups()
+            if not assets.valid_capture(image, name):
+                return self.send(404, {"error": "not found"})
+            return self.file(os.path.join(assets.CAPTURES_DIR, image, name))
         if path == "/api/phone/state":
             serial = (q.get("serial") or [""])[0]
             if serial not in {p["serial"] for p in running_emulators()}:
@@ -549,13 +647,26 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, res = act_asset(m.group(1), m.group(2), body)
             return self.send(code, res)
+        if path == "/api/record":
+            code, res = act_record(body)
+            return self.send(code, res)
+        m = re.match(r"^/api/captures/(delete|open)$", path)
+        if m:
+            code, res = act_capture(m.group(1), body)
+            return self.send(code, res)
+        if path == "/api/internet":
+            code, res = act_internet(body)
+            return self.send(code, res)
         if path == "/api/phone/feature":
             code, res = act_feature(body)
             return self.send(code, res)
         m = re.match(r"^/api/(images|apps|modules)/([^/]+)/([a-z]+)$", path)
         if m and NAME_RE.match(m.group(2)):
             kind, name, action = m.groups()
-            code, res = {"images": act_image, "apps": act_app, "modules": act_module}[kind](name, action)
+            if kind == "images":
+                code, res = act_image(name, action, body)
+            else:
+                code, res = {"apps": act_app, "modules": act_module}[kind](name, action)
             return self.send(code, res)
         if path == "/api/system-images/open":
             code, res = act_open_sysimage(str(body.get("path", "")))

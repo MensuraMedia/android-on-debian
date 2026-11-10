@@ -143,8 +143,8 @@ library only, binds to 127.0.0.1, and every button runs a logged job.
 
 | Page | Shows | Buttons |
 | --- | --- | --- |
-| Images | Emulator phones (via `aodm`), phone type first; installed SDK system images | Launch, Stop, Save; Open folder |
-| Assets | Your folders (wallpapers, photos & videos, ringtones & sounds, APKs, screenshots) in `ADX_CONSOLE_ASSETS_DIR`, and the top 10 features for the running phone | Upload (or drag and drop), Load / Remove per file or all, Set wallpaper, Install / Uninstall, Delete; location, dark mode, battery, connectivity, display & touch, clean status bar, screenshot |
+| Images | Emulator phones (via `aodm`), phone type first, specs in a grid; installed SDK system images | Launch / Stop, Save, Duplicate, Rename; Screenshot, Record, Captures (per phone); Open folder |
+| Assets | Your folders (wallpapers, photos & videos, ringtones & sounds, APKs) and per-phone captures in `ADX_CONSOLE_ASSETS_DIR`, and the top 10 features for the running phone | Upload (or drag and drop), Load / Remove per file or all, Set wallpaper, Install / Uninstall, Delete; location, dark mode, battery, connectivity, display & touch, clean status bar, screenshot |
 | Apps | Apps in `ADX_APPS_DIR` with a screenshot thumbnail (click for all) | Render (Roborazzi), Run (install + open on the emulator), Open folder |
 | Modules | `adx list` | Install (modules not ok), Run doctor |
 | Skills | `config/skills.manifest` and which apps have each skill | Links to the sources |
@@ -153,6 +153,8 @@ library only, binds to 127.0.0.1, and every button runs a logged job.
 
 Actions need a same-origin request and a per-process token. Job output:
 `~/.local/state/adx/console/`; server log: `~/.local/state/adx/console.log`.
+The sidebar's **Internet** switch cuts the running phones off the internet
+(airplane mode). Security posture and controls: [docs/security.md](docs/security.md).
 
 ## Development workflow
 

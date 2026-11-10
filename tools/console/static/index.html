@@ -58,6 +58,11 @@ a{color:var(--accent)} .mono{font-family:var(--mono)}
 .lamp .bulb{width:9px;height:9px;border-radius:50%;background:var(--pending)}
 .statusbox.on .bulb{background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
 .statusbox p{margin:8px 0 0;font-size:11.5px;color:var(--ink-soft)}
+.netctl{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.netctl .iconbtn{flex:none;width:36px;height:36px}
+.netctl .iconbtn .ico{width:18px;height:18px}
+.netctl .iconbtn.cut{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--border));background:var(--bad-soft)}
+.netctl b{display:block;font-size:12.5px} .netctl small{display:block;font-size:11px;color:var(--ink-soft)}
 
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5}
@@ -102,8 +107,28 @@ a{color:var(--accent)} .mono{font-family:var(--mono)}
 .thumb img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
 .hcard .title{font-size:21px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
 .hcard .sub{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:3px;word-break:break-all}
-.hcard .facts{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:9px;font-size:12px;color:var(--ink-soft)}
-.hcard .facts b{color:var(--ink);font-weight:600}
+.hcard .specs{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px 18px;margin:12px 0 0;max-width:620px}
+.hcard .specs div{min-width:0}
+.hcard .specs dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.hcard .specs dd{margin:2px 0 0;font-size:13px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+/* minimal icon toolbar */
+.tools{display:inline-flex;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--surface)}
+.tools button{display:inline-grid;place-items:center;width:36px;height:34px;border:0;background:none;color:var(--ink-soft);cursor:pointer;padding:0}
+.tools button+button{border-left:1px solid var(--border)}
+.tools button:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+.tools button.primary{color:var(--accent)}
+.tools button:disabled{opacity:.35;cursor:not-allowed}
+.tools button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tools .ico{width:17px;height:17px}
+.tools button.rec{color:var(--bad);background:var(--bad-soft)}
+.tools .secs{font-family:var(--mono);font-size:10px;font-weight:700;line-height:1;margin-top:1px}
+.tools button.rec{width:auto;padding:0 9px;display:inline-flex;gap:5px;align-items:center}
+.gallery figure{position:relative}
+.gallery video{width:100%;border:1px solid var(--border);border-radius:10px;display:block;background:#000}
+.gallery .fact{display:flex;gap:6px;align-items:center;margin-top:6px}
+.gallery .fact .iconbtn{width:28px;height:28px;margin-left:auto}
+.field{width:100%;font:inherit;font-size:14px;font-family:var(--mono);padding:9px 11px;border:1px solid var(--border-strong);border-radius:9px;background:var(--surface);color:var(--ink)}
+.field:focus{outline:2px solid var(--accent);outline-offset:1px}
 .hcard .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
 .hcard .side small{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
 .tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -190,6 +215,10 @@ footer{padding:14px 24px;color:var(--ink-soft);font-size:11.5px;border-top:1px s
     <div class="statusbox" id="emubox">
       <div class="lamp"><span class="bulb"></span><span id="emu-label">Emulators: checking…</span></div>
       <p id="emu-note">Phones run on the official Android Emulator, managed by aodm.</p>
+      <div class="netctl">
+        <button class="iconbtn" id="net-btn" aria-label="Internet for the phone"></button>
+        <div><b id="net-label">Internet: checking…</b><small id="net-note"></small></div>
+      </div>
     </div>
   </aside>
 
@@ -289,8 +318,8 @@ function button(icon,label,cls,onclick,disabled,title){
 function hcard({thumb,title,sub,facts,tags,small,acts,live}){
   const c=el("article","hcard"+(live?" live":""));
   c.append(thumb||el("div","handset"));
-  c.append(el("div","",`<div class="title">${esc(title)}</div><div class="sub">${esc(sub||"")}</div><div class="facts">${
-    (facts||[]).filter(f=>f[1]!==""&&f[1]!=null).map(([k,v])=>`<span>${esc(k)} <b>${esc(v)}</b></span>`).join("")}</div>`));
+  c.append(el("div","",`<div class="title">${esc(title)}</div><div class="sub">${esc(sub||"")}</div><dl class="specs">${
+    (facts||[]).filter(f=>f[1]!==""&&f[1]!=null).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`));
   const side=el("div","side");
   side.append(el("div","tags",tags||""));
   if(small)side.append(el("small","",esc(small)));
@@ -304,23 +333,123 @@ function section(title,count,unit,cards,empty){
   if(cards.length)cards.forEach(c=>l.append(c));else l.append(el("div","empty",empty));
   s.append(l);return s;
 }
-const busyTag=b=>b?`<span class="tag run">${esc({start:"launching",stop:"stopping",save:"saving",render:"rendering",run:"installing",install:"installing"}[b]||b)}</span>`:"";
+const busyTag=b=>b?`<span class="tag run">${esc({start:"launching",stop:"stopping",save:"saving",clone:"duplicating",rename:"renaming",render:"rendering",run:"installing",install:"installing"}[b]||b)}</span>`:"";
 
 /* ---- Images ---- */
+/* ---- captures: screenshots + screen recordings, one folder per phone image ---- */
+let CAPS=null;
+async function loadCaps(){try{CAPS=await getJSON("/api/captures");}catch(e){CAPS={captures:{},recording:{},limit:180};}return CAPS;}
+const capURL=(image,name)=>`/api/captures/${encodeURIComponent(image)}/${encodeURIComponent(name)}`;
+const recFor=serial=>CAPS&&CAPS.recording[serial];
+const fmtSecs=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+/* while any phone records, keep the visible page fresh so the timer and files update */
+let recPoll=null;
+function watchRec(){
+  if(recPoll)return;
+  recPoll=setInterval(async()=>{await loadCaps();refreshView();if(!Object.keys(CAPS.recording).length){clearInterval(recPoll);recPoll=null;}},2000);
+}
+async function shot(serial,image){
+  try{const d=await post("/api/phone/feature",{serial,name:"screenshot"});
+    toast(`Screenshot saved to ${image}'s folder`,true,(d.output||"").split("\n").pop());}
+  catch(e){toast("Screenshot: failed",false,e.message);}
+}
+async function record(serial,image,on){
+  try{await post("/api/record",{serial,action:on?"start":"stop"});
+    toast(on?`Recording ${image} (up to ${CAPS?CAPS.limit:180} s)`:`Recording saved to ${image}'s folder`,true);}
+  catch(e){toast("Recording: failed",false,e.message);}
+  await loadCaps();watchRec();
+}
+function capsGallery(image){
+  const scrim=el("div","modal-scrim");const close=()=>{scrim.remove();refreshView();};
+  scrim.onclick=e=>{if(e.target===scrim)close();};
+  const m=el("div","modal");
+  const hd=el("div","mhd",`<h3>Captures · <span class="mono">${esc(image)}</span></h3>`);
+  const open=el("button","btn",ICONTXT("folder-open","Open folder"));open.style.marginLeft="auto";
+  open.onclick=async()=>{try{await post("/api/captures/open",{image});}catch(e){toast("Open folder: failed",false,e.message);}};
+  const x=el("button","iconbtn",ICON("x"));x.setAttribute("aria-label","Close");x.onclick=close;
+  hd.append(open,x);
+  const g=el("div","gallery");m.append(hd,g);scrim.append(m);document.body.append(scrim);
+  document.addEventListener("keydown",function k(e){if(e.key==="Escape"){close();document.removeEventListener("keydown",k);}});
+  const fill=async()=>{await loadCaps();const items=(CAPS.captures[image]||[]);g.innerHTML="";
+    if(!items.length){g.append(el("div","empty","No captures yet. Use Screenshot or Record on this phone's card."));return;}
+    items.forEach(i=>{
+      const f=el("figure");
+      f.append(i.type==="recording"?el("video","",""):el("img"));
+      const media=f.firstChild;media.src=capURL(image,i.name);
+      if(i.type==="recording"){media.controls=true;media.preload="metadata";}else{media.loading="lazy";media.alt=i.name;}
+      const fact=el("div","fact",`${ICON(i.type==="recording"?"video-camera":"camera")}<figcaption>${esc(i.name)}<br>${(i.size/1048576).toFixed(1)} MB</figcaption>`);
+      const del=el("button","iconbtn",ICON("trash"));del.title="Delete this capture";del.setAttribute("aria-label",`Delete ${i.name}`);
+      del.onclick=async()=>{if(!confirm(`Delete ${i.name}?`))return;try{await post("/api/captures/delete",{image,name:i.name});}catch(e){toast("Delete failed",false,e.message);}fill();};
+      fact.append(del);f.append(fact);g.append(f);
+    });};
+  fill();
+}
+
+/* minimal icon toolbar: [[icon,label,onclick,disabled,title,primary]] */
+function tools(items){
+  const g=el("div","tools");g.setAttribute("role","group");
+  items.forEach(([icon,label,onclick,disabled,title,primary,cls,extra])=>{
+    const b=el("button",[primary?"primary":"",cls||""].join(" ").trim(),ICON(icon)+(extra||""));
+    b.title=title||label;b.setAttribute("aria-label",label);b.disabled=!!disabled;
+    b.onclick=async()=>{b.disabled=true;b.innerHTML=ICON("circle-notch",true);
+      try{await onclick();}catch(e){if(e.message!=="cancelled")alert(`${label}: ${e.message}`);}
+      watchJobs();refreshView();};
+    g.append(b);});
+  return g;
+}
+/* small dialog asking for a phone image name; resolves to the name or throws "cancelled" */
+function askName(title,initial,hint,taken){
+  return new Promise((resolve,reject)=>{
+    const scrim=el("div","modal-scrim");const m=el("div","modal");m.style.maxWidth="440px";
+    m.append(el("div","mhd",`<h3>${esc(title)}</h3>`));
+    const bd=el("div","");bd.style.padding="16px";
+    const inp=el("input","field");inp.value=initial;inp.setAttribute("aria-label","Image name");inp.spellcheck=false;
+    const msg=el("p","mini",esc(hint));msg.style.margin="8px 0 14px";
+    const ok=el("button","btn primary",ICONTXT("check","OK")),no=el("button","btn",ICONTXT("x","Cancel"));
+    const row=el("div","");row.style.cssText="display:flex;gap:8px;justify-content:flex-end";row.append(no,ok);
+    bd.append(inp,msg,row);m.append(bd);scrim.append(m);document.body.append(scrim);
+    const valid=()=>{const v=inp.value.trim();
+      const bad=!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v)?"Use letters, digits, . _ - (start with a letter or digit).":taken.includes(v)?`${v} already exists.`:"";
+      msg.textContent=bad||hint;msg.style.color=bad?"var(--bad)":"";ok.disabled=!!bad;return !bad;};
+    const close=v=>{scrim.remove();v===null?reject(new Error("cancelled")):resolve(v);};
+    inp.oninput=valid;ok.onclick=()=>{if(valid())close(inp.value.trim());};no.onclick=()=>close(null);
+    scrim.onclick=e=>{if(e.target===scrim)close(null);};
+    inp.onkeydown=e=>{if(e.key==="Enter"&&valid())close(inp.value.trim());if(e.key==="Escape")close(null);};
+    valid();inp.focus();inp.select();
+  });
+}
 async function loadImages(){
   const body=$("#images-body");
   let d;try{d=await getJSON("/api/images");}catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
+  await loadCaps();
+  const serialOf=p=>{const m=/:(\d+)/.exec(p.state);return m?`emulator-${m[1]}`:null;};
   body.innerHTML="";
   const phones=(d.phones||[]).map(p=>hcard({
     live:p.running, title:p.phone, sub:`${p.name} · ${p.abi}`,
-    facts:[["Android API",p.api],["Image",p.variant],["Screen",p.screen],["RAM",p.ram],["Disk",p.size],["Saves",p.saves==="-"?"none":p.saves],["Groups",p.groups]],
+    facts:[["Android API",p.api],["Image",p.variant],["Screen",p.screen],["RAM",p.ram],["Disk",p.size],["Saves",p.saves==="-"?"none":p.saves],
+      ["Captures",(()=>{const c=CAPS.captures[p.name]||[];const r=c.filter(i=>i.type==="recording").length;const n=c.length-r;return c.length?`${n} screenshot${n===1?"":"s"} · ${r} recording${r===1?"":"s"}`:"none";})()],["Groups",p.groups]],
     tags:busyTag(p.busy)||(p.running?`<span class="tag ok">${esc(p.state)}</span>`:'<span class="tag off">stopped</span>')+
       (p.keyboard==="yes"?"":'<span class="tag warn" title="adx emulator install sets hw.keyboard=yes">no host keyboard</span>'),
-    acts:[
-      button("play",p.running?"Running":"Launch","primary",()=>post(`/api/images/${encodeURIComponent(p.name)}/start`),p.running||p.busy),
-      button("stop","Stop","",()=>post(`/api/images/${encodeURIComponent(p.name)}/stop`),!p.running||p.busy),
-      button("floppy-disk","Save","",()=>post(`/api/images/${encodeURIComponent(p.name)}/save`),p.running||p.busy,p.running?"Stop the phone first: a save copies a stopped image":"Full copy with checksums (aodm save create)"),
-    ]}));
+    acts:[(()=>{
+      const u=`/api/images/${encodeURIComponent(p.name)}`,names=(d.phones||[]).map(x=>x.name);
+      const stopFirst="Stop the phone first";
+      return tools([
+        p.running?["stop","Stop",()=>post(`${u}/stop`),p.busy,"Stop (saves the quick-boot state)",true]
+                 :["play","Launch",()=>post(`${u}/start`),p.busy,"Launch in a window",true],
+        ["floppy-disk","Save",()=>post(`${u}/save`),p.running||p.busy,p.running?`${stopFirst}: a save copies a stopped image`:"Save a full copy with checksums"],
+        ["copy","Duplicate",async()=>post(`${u}/clone`,{new:await askName(`Duplicate ${p.name}`,`${p.name}_copy`,"Name for the copy. It is a full copy; its first boot is a cold boot.",names)}),
+          p.running||p.busy,p.running?`${stopFirst}: duplicate copies a stopped image`:"Duplicate this image under a new name"],
+        ["pencil-simple","Rename",async()=>post(`${u}/rename`,{new:await askName(`Rename ${p.name}`,p.name,"New name. Its saves, settings and captures move along.",names)}),
+          p.running||p.busy,p.running?`${stopFirst}: rename needs a stopped image`:"Rename this image"],
+      ]);})(),(()=>{
+      const serial=p.running?serialOf(p):null,rec=serial&&recFor(serial);
+      if(rec)watchRec();
+      return tools([
+        ["camera","Screenshot",()=>shot(serial,p.name),!serial,serial?`Save a screenshot to ${p.name}'s captures folder`:"Launch the phone first"],
+        rec?["stop-circle","Stop recording",()=>record(serial,p.name,false),false,`Stop and save the recording (${fmtSecs(rec.seconds)} of ${fmtSecs(rec.limit)})`,false,"rec",`<span class="secs">${fmtSecs(rec.seconds)}</span>`]
+           :["record","Record",()=>record(serial,p.name,true),!serial,serial?`Record the screen to ${p.name}'s captures folder (up to ${fmtSecs(CAPS.limit)})`:"Launch the phone first"],
+        ["images","Captures",async()=>capsGallery(p.name),false,`Screenshots and recordings of ${p.name}`],
+      ]);})()]}));
   body.append(section("Emulator phones",phones.length,"phone",phones,
     d.aodm?"No emulator phones yet: adx emulator install creates one.":"aodm not found: install it with adx devices install."));
   const sys=(d.system_images||[]).map(s=>hcard({
@@ -329,7 +458,7 @@ async function loadImages(){
     facts:[["ABI",s.abi],["Revision",s.revision],["Extension level",s.extension]],
     tags:s.used_by.length?`<span class="tag ok">used by ${s.used_by.length}</span>`:'<span class="tag off">unused</span>',
     small:s.used_by.join(", "),
-    acts:[button("folder-open","Open folder","",()=>post("/api/system-images/open",{path:s.path}))]}));
+    acts:[tools([["folder-open","Open folder",()=>post("/api/system-images/open",{path:s.path}),false,"Open this system image's folder"]])]}));
   body.append(section("System images",sys.length,"image",sys,"No system images installed: adx emulator install adds the one in config/defaults.env."));
 }
 
@@ -340,7 +469,6 @@ const KIND_META={
   media:{title:"Photos & videos",icon:"film-strip",tile:true},
   sounds:{title:"Ringtones & sounds",icon:"music-notes",tile:false},
   apps:{title:"Apps (APK)",icon:"package",tile:false},
-  screenshots:{title:"Screenshots",icon:"camera",tile:true},
 };
 function toast(msg,ok,detail){
   document.querySelectorAll(".toast").forEach(t=>t.remove());
@@ -377,7 +505,7 @@ async function loadAssets(){
   const body=$("#assets-body");
   let d;try{d=await getJSON("/api/assets"+(TARGET?`?serial=${encodeURIComponent(TARGET)}`:""));}
   catch(e){body.innerHTML='<div class="empty">Console backend not reachable.</div>';return;}
-  ASSETS=d;TARGET=d.target;
+  ASSETS=d;TARGET=d.target;await loadCaps();
   let st={};if(TARGET){try{st=await getJSON(`/api/phone/state?serial=${encodeURIComponent(TARGET)}`);}catch(e){}}
   const off=!TARGET;
   body.innerHTML="";
@@ -437,14 +565,34 @@ async function loadAssets(){
   const tch=el("label","",`${ICON("hand-pointing")}Show taps`);tch.append(seg([["on","On"],["off","Off"]],st.touches,v=>act(`Show taps ${v}`,"/api/phone/feature",{name:"touches",value:v}),off));
   fs.append(feat(9,"text-aa","Display & touch","Large text for accessibility checks, animations off for steady tests, taps shown for recordings.",[fsSel,anim,tch]));
   /* 10 clean status bar + screenshot */
-  fs.append(feat(10,"sparkle","Clean status bar & screenshot","Demo mode: 12:00, full battery and signal, no notifications. Then capture the screen to Screenshots.",[
+  fs.append(feat(10,"sparkle","Clean status bar & captures","Demo mode: 12:00, full battery and signal, no notifications. Then take a screenshot or record the screen into this phone's captures folder.",[
     seg([["on","Clean"],["off","Normal"]],st.demo,v=>act(`Clean status bar ${v}`,"/api/phone/feature",{name:"demo",value:v}),off),
-    actBtn("camera","Screenshot","primary",()=>act("Screenshot","/api/phone/feature",{name:"screenshot",value:""}),off)]));
+    actBtn("camera","Screenshot","primary",()=>act("Screenshot","/api/phone/feature",{name:"screenshot",value:""}),off),
+    (()=>{const rec=TARGET&&recFor(TARGET);const img=TARGET&&(d.phones.find(x=>x.serial===TARGET)||{}).name;if(rec)watchRec();
+      return rec?actBtn("stop-circle",`Stop ${fmtSecs(rec.seconds)}`,"",()=>record(TARGET,img,false).then(loadAssets),false,"Stop and save the recording")
+                :actBtn("record","Record","",()=>record(TARGET,img,true).then(loadAssets),off,"Record the screen to this phone's captures folder");})()]));
   body.append(fs);
 
   /* libraries (the folders) */
   body.append(el("div","sec-hd",`<h2>Your folders</h2><span class="n mono">${esc(d.dir)}</span>`));
   Object.keys(KIND_META).forEach(kind=>body.append(libSection(kind,d,off)));
+  body.append(capturesSection());
+}
+/* Captures folder on the Assets page: one row per phone image */
+function capturesSection(){
+  const sec=el("section","lib");sec.id="lib-captures";
+  const all=CAPS?CAPS.captures:{};const images=Object.keys(all);
+  const total=images.reduce((n,k)=>n+all[k].length,0);
+  sec.append(el("div","lh",`${ICON("images")}<h2>Captures</h2><span class="tag off">${total} file${total===1?"":"s"}</span><span class="sp"></span><div class="path">${esc(CAPS?CAPS.dir:"")}/&lt;phone image&gt; · screenshots (.png) and screen recordings (.mp4), kept per phone</div>`));
+  if(!images.length){sec.append(el("div","drop-hint","No captures yet: use Screenshot or Record (feature 10, or a phone's card on Images)."));return sec;}
+  const rows=el("div","rows");
+  images.forEach(img=>{const c=all[img],r=c.filter(i=>i.type==="recording").length;
+    const row=el("div","rowitem",`<div><span class="nm">${esc(img)}</span><small>${c.length-r} screenshot${c.length-r===1?"":"s"} · ${r} recording${r===1?"":"s"}</small></div><span></span>`);
+    const a=el("div","acts");a.style.marginTop="0";
+    const v=el("button","btn",ICONTXT("images","View"));v.onclick=()=>capsGallery(img);
+    const o=el("button","btn",ICONTXT("folder-open","Open folder"));o.onclick=async()=>{try{await post("/api/captures/open",{image:img});}catch(e){toast("Open folder: failed",false,e.message);}};
+    a.append(v,o);row.append(a);rows.append(row);});
+  sec.append(rows);return sec;
 }
 async function uploadFiles(kind,files){
   const ext=ASSETS.ext[kind];let ok=0,bad=[];
@@ -641,6 +789,39 @@ async function refreshStatus(){
   }catch(e){}
 }
 
+/* ---- sidebar: internet switch for the running phones (airplane mode) ---- */
+let NET=null;
+async function refreshNet(){
+  const btn=$("#net-btn"),label=$("#net-label"),note=$("#net-note");
+  try{NET=(await getJSON("/api/internet")).phones;}catch(e){NET=null;}
+  btn.classList.remove("cut");
+  if(!NET||!NET.length){
+    btn.innerHTML=ICON("globe");btn.disabled=true;btn.title="No phone running";
+    label.textContent="Internet: no phone";note.textContent="Launch a phone first.";return;}
+  const off=NET.filter(p=>p.internet==="off");
+  btn.disabled=false;
+  if(off.length){
+    btn.classList.add("cut");btn.innerHTML=ICON("wifi-slash");
+    btn.title="Restore the phone's internet (airplane mode off)";btn.setAttribute("aria-pressed","true");
+    label.textContent=off.length===NET.length?"Internet: off":`Internet: off for ${off.length}/${NET.length}`;
+    note.textContent="Airplane mode on: no Wi-Fi or data.";
+  }else{
+    btn.innerHTML=ICON("globe");btn.title="Cut the phone's internet (airplane mode on)";btn.setAttribute("aria-pressed","false");
+    label.textContent="Internet: on";note.textContent=`${NET.length} phone${NET.length===1?"":"s"} online. Click to cut.`;
+  }
+}
+$("#net-btn").onclick=async()=>{
+  const btn=$("#net-btn");const want=btn.classList.contains("cut")?"on":"off";
+  btn.disabled=true;btn.innerHTML=ICON("circle-notch",true);
+  $("#net-label").textContent=want==="off"?"Cutting internet…":"Restoring internet…";
+  try{const d=await post("/api/internet",{state:want});
+    toast(want==="off"?"Internet cut: the phone is offline":"Internet restored",true,
+      (d.output||"").split("\n").filter(l=>/internet (reachable|unreachable)/.test(l)).join("\n"));}
+  catch(e){toast("Internet switch: failed",false,e.message+"\nFull output: Activity");}
+  await refreshNet();
+  if(current==="assets")loadAssets();
+};
+
 /* ---- navigation ---- */
 const NAV=[["images","Images",loadImages],["assets","Assets",loadAssets],["apps","Apps",loadApps],["modules","Modules",loadModules],
   ["skills","Skills",loadSkills],["activity","Activity",loadActivity],["settings","Settings",loadSettings]];
@@ -664,7 +845,7 @@ $("#theme").innerHTML=ICON("circle-half");
 $("#theme").onclick=()=>{const r=document.documentElement;const cur=r.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");r.setAttribute("data-theme",cur==="dark"?"light":"dark");};
 
 select(location.hash.slice(1)||"images");
-refreshStatus();
-setInterval(()=>{if(!document.hidden)refreshStatus();},15000);
+refreshStatus();refreshNet();
+setInterval(()=>{if(!document.hidden){refreshStatus();refreshNet();}},15000);
 getJSON("/api/jobs").then(d=>{if(d.jobs.some(j=>j.status==="running"))watchJobs();}).catch(()=>{});
 </script>

@@ -12,6 +12,7 @@ import glob
 import os
 import re
 import subprocess
+import threading
 import time
 
 ANDROID_HOME = os.environ.get("ANDROID_HOME") or os.path.expanduser("~/Android/Sdk")
@@ -29,8 +30,12 @@ KINDS = {
     "sounds": {"ext": (".mp3", ".ogg", ".wav", ".m4a", ".flac", ".aac"),
                "phone": ["Ringtones/adx", "Notifications/adx", "Alarms/adx"]},
     "apps": {"ext": (".apk",), "phone": None},
-    "screenshots": {"ext": (".png",), "phone": None},
 }
+# Screenshots and screen recordings, one folder per phone image (segregated per phone).
+CAPTURES_DIR = os.path.join(ASSETS_DIR, "captures")
+CAPTURE_EXT = (".png", ".mp4")
+IMAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+REC_LIMIT = 180   # seconds; Android's screenrecord stops by itself at 3 minutes
 MAGIC = {".png": [b"\x89PNG"], ".jpg": [b"\xff\xd8\xff"], ".jpeg": [b"\xff\xd8\xff"],
          ".gif": [b"GIF8"], ".webp": [b"RIFF"], ".apk": [b"PK\x03\x04"]}
 MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
@@ -126,7 +131,7 @@ def library(kind):
 
 def save_upload(kind, name, data):
     """Store an uploaded file in the library. Returns (ok, message, stored name)."""
-    if kind not in KINDS or kind == "screenshots":
+    if kind not in KINDS:
         return False, "uploads go to wallpapers, media, sounds or apps", ""
     name = clean_name(name)
     ext = os.path.splitext(name)[1]
@@ -259,15 +264,128 @@ def uninstall_apk(log, serial, name):
     adb(log, serial, "uninstall", pkg, timeout=120)
 
 
-def screenshot(log, serial):
-    os.makedirs(kind_dir("screenshots"), exist_ok=True)
-    name = f"{serial}-{time.strftime('%Y%m%d-%H%M%S')}.png"
+# ------------------------------------------- captures (per phone image) ---
+def capture_dir(image):
+    if not IMAGE_RE.match(image or ""):
+        raise ValueError(f"bad image name {image!r}")
+    return os.path.join(CAPTURES_DIR, image)
+
+
+def captures():
+    """{image: [files]} for every phone image that has captures, newest first."""
+    out = {}
+    for image in sorted(os.listdir(CAPTURES_DIR)) if os.path.isdir(CAPTURES_DIR) else []:
+        d = os.path.join(CAPTURES_DIR, image)
+        if not (IMAGE_RE.match(image) and os.path.isdir(d)):
+            continue
+        items = []
+        for f in os.listdir(d):
+            p = os.path.join(d, f)
+            if SAFE_NAME.match(f) and f.lower().endswith(CAPTURE_EXT) and os.path.isfile(p):
+                st = os.stat(p)
+                items.append({"name": f, "size": st.st_size, "mtime": int(st.st_mtime),
+                              "type": "recording" if f.endswith(".mp4") else "screenshot",
+                              "mime": MIME[os.path.splitext(f)[1]]})
+        out[image] = sorted(items, key=lambda i: i["mtime"], reverse=True)
+    return out
+
+
+def valid_capture(image, name):
+    return (IMAGE_RE.match(image or "") and SAFE_NAME.match(name or "") and name.lower().endswith(CAPTURE_EXT)
+            and os.path.isfile(os.path.join(CAPTURES_DIR, image, name)))
+
+
+def delete_capture(image, name):
+    if not valid_capture(image, name):
+        return False
+    os.remove(os.path.join(CAPTURES_DIR, image, name))
+    return True
+
+
+def stamp(image, ext):
+    return f"{image}-{time.strftime('%Y%m%d-%H%M%S')}{ext}"
+
+
+def screenshot(log, serial, image):
+    d = capture_dir(image)
+    os.makedirs(d, exist_ok=True)
+    name = stamp(image, ".png")
     code, data = adb(log, serial, "exec-out", "screencap", "-p", binary=True, timeout=30)
     if code != 0 or not data.startswith(b"\x89PNG"):
         return log.fail("screencap returned no PNG")
-    with open(os.path.join(kind_dir("screenshots"), name), "wb") as fh:
+    with open(os.path.join(d, name), "wb") as fh:
         fh.write(data)
-    log.note(f"saved {name} ({len(data) // 1024} kB) to {kind_dir('screenshots')}")
+    log.note(f"saved {name} ({len(data) // 1024} kB) to {d}")
+
+
+# Screen recording: screenrecord runs on the phone (up to REC_LIMIT s); Stop sends it
+# SIGINT so the MP4 is finalised, then the file is pulled into the image's folder and
+# removed from the phone. One recording per phone at a time.
+RECORDING = {}
+REC_LOCK = threading.Lock()
+
+
+def recordings():
+    with REC_LOCK:
+        return {s: {"image": r["image"], "name": r["name"], "seconds": int(time.time() - r["started"]),
+                    "limit": REC_LIMIT} for s, r in RECORDING.items()}
+
+
+def rec_start(log, serial, image, on_saved):
+    """Start recording; on_saved(serial) is called (in a thread) once the file is saved."""
+    capture_dir(image)   # validates the name
+    with REC_LOCK:
+        if serial in RECORDING:
+            return log.fail("already recording this phone")
+        name = stamp(image, ".mp4")
+        remote = f"/sdcard/Movies/adx-rec-{name}"
+        args = [adb_path(), "-s", serial, "shell", "screenrecord", "--time-limit", str(REC_LIMIT), remote]
+        log.lines.append("$ " + " ".join(args))
+        try:
+            proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, start_new_session=True)
+        except OSError as e:
+            return log.fail(str(e))
+        RECORDING[serial] = {"proc": proc, "remote": remote, "image": image, "name": name,
+                             "started": time.time(), "saved": threading.Event()}
+    log.note(f"recording {image} (stops by itself after {REC_LIMIT} s)")
+
+    def waiter():
+        proc.wait()
+        on_saved(serial)
+    threading.Thread(target=waiter, daemon=True).start()
+
+
+def rec_finish(log, serial):
+    """Pull the finished recording into the image's folder (called when screenrecord exits)."""
+    with REC_LOCK:
+        r = RECORDING.get(serial)
+    if not r:
+        return
+    try:
+        d = capture_dir(r["image"])
+        os.makedirs(d, exist_ok=True)
+        time.sleep(1)   # let the phone flush the file
+        adb(log, serial, "pull", r["remote"], os.path.join(d, r["name"]), timeout=300)
+        adb(log, serial, "shell", f"rm -f '{r['remote']}'", check=False)
+        if log.ok:
+            log.note(f"saved {r['name']} to {d}")
+    finally:
+        with REC_LOCK:
+            RECORDING.pop(serial, None)
+        r["saved"].set()
+
+
+def rec_stop(log, serial):
+    with REC_LOCK:
+        r = RECORDING.get(serial)
+    if not r:
+        return log.fail("this phone is not recording")
+    adb(log, serial, "shell", "pkill -INT screenrecord", check=False)
+    if not r["saved"].wait(60):
+        log.fail("the recording did not finish within 60 s")
+    else:
+        log.note(f"stopped; saved as {r['name']} in {capture_dir(r['image'])}")
 
 
 # ---------------------------------------------------- phone: features ---
@@ -333,8 +451,6 @@ def feature(log, serial, name, value):
         else:
             adb(log, serial, "shell", "am", "broadcast", "-a", DEMO, "-e", "command", "exit")
         STATE.setdefault(serial, {})["demo"] = v
-    elif name == "screenshot":
-        screenshot(log, serial)
     else:
         log.fail("unknown feature " + name)
 
