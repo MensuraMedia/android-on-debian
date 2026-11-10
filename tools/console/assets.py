@@ -188,16 +188,44 @@ def installed_packages(serial):
 
 
 def apk_package(name):
-    tool = aapt2()
-    if not tool:
-        return ""
+    return apk_info(name).get("package", "")
+
+
+APK_INFO = {}   # (name, mtime, size) -> badging facts; reading an APK takes a moment
+
+
+def apk_info(name):
+    """What an APK really is (files are often named after something else): package,
+    label, version, native ABIs. Empty values when aapt2 can't read it."""
+    path = os.path.join(kind_dir("apps"), name)
     try:
-        p = subprocess.run([tool, "dump", "packagename", os.path.join(kind_dir("apps"), name)],
-                           capture_output=True, text=True, timeout=30)
-        pkg = p.stdout.strip()
-        return pkg if p.returncode == 0 and re.match(r"^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+$", pkg) else ""
-    except (OSError, subprocess.SubprocessError):
-        return ""
+        key = (name, os.path.getmtime(path), os.path.getsize(path))
+    except OSError:
+        return {}
+    if key in APK_INFO:
+        return APK_INFO[key]
+    info = {"package": "", "label": "", "version": "", "abis": []}
+    tool = aapt2()
+    if tool:
+        try:
+            p = subprocess.run([tool, "dump", "badging", path], capture_output=True, text=True, timeout=60)
+            out = p.stdout if p.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        m = re.search(r"^package: name='([^']+)'.*?versionName='([^']*)'", out, re.M)
+        if m and re.match(r"^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+$", m.group(1)):
+            info["package"], info["version"] = m.group(1), m.group(2)
+        m = re.search(r"^application-label:'([^']*)'", out, re.M)
+        info["label"] = m.group(1) if m else ""
+        m = re.search(r"^native-code: (.*)$", out, re.M)
+        info["abis"] = re.findall(r"'([^']+)'", m.group(1)) if m else []
+    APK_INFO[key] = info
+    return info
+
+
+def phone_abis(serial):
+    _c, out = adb(Log(), serial, "shell", "getprop", "ro.product.cpu.abilist", check=False, timeout=15)
+    return [a for a in out.strip().split(",") if a]
 
 
 def load(log, serial, kind, name):

@@ -688,7 +688,11 @@ function libSection(kind,d,off){
   }else{
     const rows=el("div","rows");
     items.forEach(i=>{
-      const r=el("div","rowitem",`<div><span class="nm">${esc(i.name)}</span><small>${kind==="apps"?esc(i.package||"package unreadable"):""} ${(i.size/1048576).toFixed(1)} MB${i.on_phone?' · <span class="tag ok">'+(kind==="apps"?"installed":"on phone")+'</span>':""}</small></div>`);
+      /* apps: what the APK really is (files are often named after another app) */
+      const appInfo=kind!=="apps"?"":(i.label?`<b>${esc(i.label)}</b>${i.version?" "+esc(i.version):""} · `:"")+esc(i.package||"package unreadable")+" · "+
+        (i.same_as&&i.same_as.length?` <span class="tag warn" title="Installing or removing either changes the same app">same app as ${esc(i.same_as.join(", "))}</span>`:"")+
+        (i.abi_ok===false?` <span class="tag warn" title="Native code only for: ${esc((i.abis||[]).join(", "))}">won't install on this phone (ABI)</span>`:"");
+      const r=el("div","rowitem",`<div><span class="nm">${esc(i.name)}</span><small>${appInfo} ${(i.size/1048576).toFixed(1)} MB${i.on_phone?' · <span class="tag ok">'+(kind==="apps"?"installed":"on phone")+'</span>':""}</small></div>`);
       if(kind==="sounds"){const a=el("audio");a.controls=true;a.preload="none";a.src=file(i);r.append(a);}else r.append(el("span"));
       const row=el("div","acts");row.style.marginTop="0";row.append(loadRm(i),del(i));r.append(row);rows.append(r);
     });

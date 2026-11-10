@@ -344,6 +344,16 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- Console Assets, Apps (APK): a library APK showed only its file name, so a
+  file named after one app but containing another went unnoticed (seen:
+  `uptodown-com.brave.browser.apk` is the Uptodown store, `com.uptodown`;
+  installing it did not install Brave, and Uninstall removed Uptodown).
+  Each APK now shows its real app name, version and package (read with
+  `aapt2 dump badging`, cached), "same app as …" when two files are one
+  app, and "won't install on this phone (ABI)" when it has native code for
+  none of the phone's ABIs. Verified 2026-11-10: upload → Install → launch
+  → Uninstall → Delete of a test APK through the page; the owner's four
+  installs had succeeded, and their apps launch.
 - Security: an app inside an online emulator phone could reach the adx
   console at 10.0.2.2:8766 by sending `Host: 127.0.0.1` itself, read every
   phone's logcat and run console actions (e.g. put an offline phone back

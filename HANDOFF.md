@@ -69,6 +69,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   `emulator`) has none; an adb server restart ends it until the next start;
   no size cap per run (a chatty day can reach tens of MB; the console viewer
   reads the whole file); no crash/ANR extracts yet.
+- Assets APK installer: plain `.apk` files only (no split APKs, `.apks`,
+  `.xapk` or `.aab`; install those with `adb install-multiple` or
+  bundletool). APKs from mirror sites can carry another app than their
+  file name says: the page now shows the real app name and package.
 - App pipeline, recorded rather than fixed:
   - one phone per run, and only emulators (no physical phones yet);
   - smoke checks only that the app launches and stays up: no instrumented

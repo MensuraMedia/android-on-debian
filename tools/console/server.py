@@ -252,9 +252,14 @@ def assets_view(serial):
         items = assets.library(kind)
         if kind == "apps":
             installed = assets.installed_packages(target) if target else set()
+            abis = assets.phone_abis(target) if target else []
             for i in items:
-                i["package"] = assets.apk_package(i["name"])
-                i["on_phone"] = i["package"] in installed
+                i.update(assets.apk_info(i["name"]))
+                i["on_phone"] = bool(i.get("package")) and i["package"] in installed
+                # Native code for none of the phone's ABIs: the install would fail.
+                i["abi_ok"] = not i.get("abis") or not abis or bool(set(i["abis"]) & set(abis))
+            for i in items:   # after every package is known
+                i["same_as"] = [j["name"] for j in items if j is not i and j.get("package") and j.get("package") == i.get("package")]
         else:
             present = assets.on_phone(target, kind) if target else set()
             for i in items:
