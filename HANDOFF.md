@@ -28,7 +28,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Per-phone logcat | Every start saves `~/.local/state/adx/logcat-NAME.log` (previous starts `.1`…`.5`, `ADX_LOG_KEEP`): `adx logs logcat`, `aodm logs --image NAME --logcat`, console **Logcat** (run picker, filter). Verified on both start paths |
 | Security | Posture measured and written up in [docs/security.md](docs/security.md) (2026-11-09): no inbound path from the internet (NAT, loopback-only ports, ufw on); test-device weaknesses accepted by decision; one open finding in LinSmartPhone (separate repo, not fixed here) |
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
-| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `8894b30`); `feat/aodm` merged (`4b5f242`) and can be deleted |
+| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `14cfa9a`; local `main` pulled to it 2026-11-10); `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
 ## This machine (hybrid-GPU laptop)
@@ -40,9 +40,17 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - User is in the `kvm` group but this login predates it: log out and back in once.
 - Menu entries installed: Android Emulator (`adx emulator desktop`), Phone
   Images (`aod-gui`), adx console.
-- `adx_api37` baseline save: `20261110-012304Z-baseline` (8.7 GB, pinned,
-  verified). `aodm save restore adx_api37 20261110-012304Z-baseline` returns
-  the phone to it.
+- `./adx up` run on 2026-11-10 at `14cfa9a`: aodm/aod-gui 0.3.0-dev
+  (`v0.2.0-28-g14cfa9a`) installed, console module installed, `adx doctor`
+  clean. Console started at http://127.0.0.2:8766.
+- Images: only `adx_api37` (stopped). The `throwaway` and `throwaway-clone`
+  test images and throwaway's save were deleted on 2026-11-10.
+- **No saves exist.** An earlier note here listed an `adx_api37` baseline save
+  `20261110-012304Z-baseline`; on 2026-11-10 22:20 it was not in
+  `~/.local/share/aod/saves` and `adx.log` has no record of it being created or
+  deleted. Make a new one with `aodm save create adx_api37` if needed.
+- Local backups (tar.gz + `backup-log.md`, build output excluded):
+  `~/backups/android-on-debian/` and `~/backups/HelloAdx/` (2026-11-10, `14cfa9a`).
 - Emulator GPS location was left at Paris (48.85, 2.35) by a console test.
 
 ## Known issues
