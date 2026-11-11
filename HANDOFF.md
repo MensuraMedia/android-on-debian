@@ -28,7 +28,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Per-phone logcat | Every start saves `~/.local/state/adx/logcat-NAME.log` (previous starts `.1`…`.5`, `ADX_LOG_KEEP`): `adx logs logcat`, `aodm logs --image NAME --logcat`, console **Logcat** (run picker, filter). Verified on both start paths |
 | Security | Posture measured and written up in [docs/security.md](docs/security.md) (2026-11-09): no inbound path from the internet (NAT, loopback-only ports, ufw on); test-device weaknesses accepted by decision; one open finding in LinSmartPhone (separate repo, not fixed here) |
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
-| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `14cfa9a`; local `main` pulled to it 2026-11-10); `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
+| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `14cfa9a`, 2026-11-10; local `main` pulled to it). Since 0.2.0: `a46c1be` app pipeline + offline phones + per-phone logcat + app dev/release docs, `360d7cb` console APK identity fix, `14cfa9a` app-library design + framework change process + emulator multi-display plan. Working tree clean. `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
 ## This machine (hybrid-GPU laptop)
