@@ -11,7 +11,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | --- | --- |
 | Framework | 17 modules (`./adx list`, all ok on 2026-11-09); `./adx up` idempotent and `./adx doctor` exit 0 on the hybrid-GPU laptop (Mint 22.3). `studio` is optional and not in any profile. New AVDs get `hw.keyboard=yes` (`ADX_AVD_HW_KEYBOARD`) so the host keyboard types into the emulator |
 | Render loop (Roborazzi) | Verified; app baselines now committed in `app/src/test/screenshots/` |
-| Live loop (emulator + adb) | Verified: `adx emulator start --window`, install, launch, location via `adb emu geo fix` |
+| Live loop (emulator + adb) | **DOWN 2026-11-10: no phone emulated** — `adx_api37` quick-boot snapshot `default_boot` fails to load (see Known issues, top). Previously verified: `adx emulator start --window`, install, launch, location via `adb emu geo fix` |
 | mobile-mcp | Verified from a live Claude Code session (list devices/elements, tap, screenshot) |
 | Logging | `~/.local/state/adx/adx.log` (+ emulator logs, previous runs kept); `adx logs`, `adx env` |
 | Claude integration | Global rules + `adversarial-reviewer` agent via `claude-rules`; mobile-mcp pinned 1.0.16 |
@@ -54,6 +54,34 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - Emulator GPS location was left at Paris (48.85, 2.35) by a console test.
 
 ## Known issues
+
+- **[OPEN, major, 2026-11-10] No phone is emulated — quick-boot snapshot load
+  fails.** `adx_api37` will not come up: `aodm health` shows it `stopped`,
+  `adb devices` is empty, and no `qemu-system` process runs (the only
+  `emulator`-matching processes are orphaned logcat `wait-for-device` guards
+  from failed start attempts, pids seen 2140231/2141436; they exit at their
+  240 s timeout). Toolchain is fine: `adx emulator status` reports emulator
+  37.2.13, system image present, AVD ok, KVM accessible, GPU host.
+  - **Cause (from `~/.local/state/adx/emulator-adx_api37*.log`):** the emulator
+    starts, passes compatibility checks, then fails loading the quick-boot
+    snapshot:
+    `qemu-system-x86_64: Missing section footer for 0000:00:0b.0/goldfish_address_space`,
+    `Error -22 while loading VM state`, `Failed to load snapshot 'default_boot'`.
+    The `default_boot` quick-boot snapshot (the ~4 GB saved RAM beside the AVD)
+    is corrupt or incompatible, and the start aborts instead of falling back
+    to a cold boot.
+  - **Likely fixes (deferred, to resolve later):** cold-boot once to discard
+    the bad snapshot — `emulator @adx_api37 -no-snapshot-load` (or
+    `adx emulator start --window` wired to pass it), or `adx emulator start
+    --wipe` (wipes user data too), then let a fresh quick-boot snapshot be
+    written on clean exit. If it recurs, consider disabling quick-boot
+    (`-no-snapshot`) by default for this image, or restoring the pinned
+    baseline save `20261110-012304Z-baseline` (note: another session reported
+    this baseline "not found" after `adx up` — verify it exists first:
+    `aodm save list adx_api37`).
+  - **Also to check when resolving:** the start path should **fall back to a
+    cold boot** when a snapshot load fails rather than leave orphaned
+    `wait-for-device` logcat guards; today it does not.
 
 - Window `aod-gui` (P10a), recorded rather than fixed:
   - Screenshots are full raw frames (~10 MB each through adb, ~1.5 s) taken one
