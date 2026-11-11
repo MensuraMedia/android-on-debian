@@ -3,7 +3,7 @@
 What android-on-debian (AOD, `adx`) does today, what is being built, and what
 comes later. Released detail is in [CHANGELOG.md](CHANGELOG.md); current state
 and open decisions in [HANDOFF.md](HANDOFF.md); the full design of the phone
-image manager in the approved plan (summarised in §2). Updated 2026-11-06.
+image manager in the approved plan (summarised in §2). Updated 2026-11-10.
 
 Status keys: **Shipped** (released and tagged) · **Done, unreleased** (on a
 branch, not yet tagged) · **In progress** · **Planned** (approved, scheduled
@@ -74,6 +74,22 @@ The ten multi-device features delivered across P2–P8: inventory dashboard;
 create from templates in batches; lifecycle for one/group/all; full-copy saves;
 clone/rename/delete; groups and tags; bulk settings profiles; bulk app deploy;
 broadcast and capture; health and version card.
+
+### Planned: app library (staged APKs, modification, promotion)
+Design: [docs/app-library.md](docs/app-library.md). Every APK the environment
+builds, imports, pulls from a phone or modifies is kept per app in **dev**,
+**test** and **prod** stages, with provenance, ownership class (`own`,
+`licensed`, `evaluation`), lineage and stage gates. Production APKs can be
+opened (decoded into a git workspace), modified, rebuilt, re-signed and sent
+back to test and/or dev. Managed from the console's **Libraries** page and
+`adx library`. Test case: Pinterest 14.43.0 (evaluation, not for deployment).
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| L1 | Library storage and records; `import`, `pull`, `list`, `show`, `promote`, `send-back`, `unstage`, `install`, `verify`, `gc`, `rm`; migration of the Assets `apps/` folder; console Libraries page | Planned |
+| L2 | Pipeline integration: built APKs enter dev, `adx pipeline run --artifact`, gates read run results; release stage → prod | Planned |
+| L3 | `apk-tools` module (apktool, jadx); token-saving decompile utility `adx apk decompile/recompile/find/class/status` with workspace indexes (`INDEX.md`, class/string/layout tables); `open`, `rebuild`, `diff`; workspace `CLAUDE.md`; console open/rebuild/diff/lineage | Planned |
+| L4 | Split APKs and bundles (`.apks`, `.xapk`, `.aab`); lineage graph; export of own artifacts | Planned |
 
 ### Decision needed (owner)
 | Item | Detail |

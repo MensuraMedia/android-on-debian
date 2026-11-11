@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-10 (v0.2.0 released; adx console; offline phones, per-phone logcat; app pipeline; app dev & release requirements)
+# Handoff — updated 2026-11-10 (v0.2.0 released; adx console; offline phones, per-phone logcat; app pipeline; app dev & release requirements; app library design; framework change process; emulator multi-display requested)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -20,6 +20,8 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Phone image manager | On `main` (merged from `feat/aodm`, P5a): `aodm list`, `show`, `card`, `env`, `start/stop/restart/health` (names, `--all`, `--group`, `--tag`, `--running`), `save create/list/show/verify/restore/open/pin/delete/prune`, `clone`, `rename`, `delete`, `wipe`, `group`, `tag`, and manager commands `doctor`, `config`, `logs`, `audit`, `disk`, `gc`, `completion`; global `--json`, `--dry-run`, `-q/-v`, `--sandbox`, `--yes`; exit codes 0–5 (docs/aodm-cli.md §3); installed by `adx devices install`; 77 tests incl. fake-SDK and sandboxed-CLI integration tests and the docs/CLI gate; `wipe` verified on a throwaway image (marker gone, first boot 26 s); lifecycle and saves verified on the real emulator (three images on 5554/5556/5558). Saves in `~/.local/share/aod/saves`. Logs: `grep 'aodm #' ~/.local/state/adx/adx.log`, emulator output in `emulator-<image>.log` |
 | Web console | `adx console start` (menu: adx console, own icon in menu/panel/Alt+Tab) → http://127.0.0.2:8766 (out of the phones' reach), Python stdlib only. Images: aodm Launch/Stop, Save, Duplicate (clone), Rename, plus per-phone Screenshot, Record (≤180 s) and Captures gallery (`~/.local/share/adx/assets/captures/<image>/`); system images. Assets: upload folders (wallpapers, photos & videos, sounds, APKs) + top 10 phone features. Sidebar: Internet switch (airplane mode, ping-checked). Per phone: Go offline / Go online and a Logcat viewer (below). Apps (pipeline: New app, Run pipeline, Runs, Record screenshots, Open folder; pipeline skills), Modules (Install, doctor), Activity, Settings. Every page and action verified in headless Chromium and against the API 37 emulator (phone state reset afterwards); Whole console **not yet adversarially reviewed** (only the offline/logcat change was, 2026-11-10). Server log `~/.local/state/adx/console.log`, job logs `~/.local/state/adx/console/` |
 | App dev & release docs | [docs/app-development-and-release.md](docs/app-development-and-release.md) (2026-11-10): machine/toolchain/project requirements, pipeline, definition of done, release and store requirements, manual release checklist |
+| App library (design) | [docs/app-library.md](docs/app-library.md) (2026-11-10, **design only, nothing built**): per-app APK libraries in dev/test/prod stages, provenance/lineage/ownership, version-last names (`<label>-<id>-v<ver>[+mN]`), `adx library`/`adx apk` CLIs with a token-saving decompile/recompile utility and workspace indexes, a **re-signed like-for-like baseline** and feed-inspection recipe for 1-to-1 comparison, stage gates, pipeline integration, console **Libraries** page replacing the Assets "Apps" list. One adversarial review (9 findings) applied. Build governance in §1.1. Phases L1–L4 in ROADMAP.md |
+| Framework change process | [docs/architecture.md](docs/architecture.md) "How changes are made": **two tracks** — apps follow app best practices; any enhancement to the adx console, the emulator or their properties follows plan → design (a technical doc) → strict modular development (modules, contract-only, config in `defaults.env`, thin front ends over `adx` CLIs) → `adx check` + adversarial/deployment review per phase |
 | App pipeline | `adx pipeline run <App>` (build → lint → test → deploy → smoke) with run records in `~/.local/share/adx/pipeline/<App>/`; console Apps page (Run pipeline, Runs, New app, pipeline skills). Verified 2026-11-10: MeridianWeather and HelloAdx pass all stages; a compile error, a screenshot change and a launch crash each fail the right stage with the evidence; a fresh template app records its references on the first run and verifies on the second; console flow in headless Chromium |
 | Console offline | The console needs no internet. Its window (Brave/Chrome `--app`, profile `~/.local/state/adx/console-window`) runs with background networking off and a dead proxy for non-loopback traffic; verified 2026-11-10: no outside connections in 60 s (before: Brave reached a CDN). Skills-page GitHub links don't open there |
 | Offline phones | `aodm net NAME offline\|online` (registry `offline`), console **Go offline** on the card. Applies at start, in every start path (aodm, aod-gui, console, `adx emulator start`): restricted user-mode network + netsim Wi-Fi off. Verified 2026-11-10 on API 37 / emulator 37.2.13: ping, TCP out and 10.0.2.2 blocked, adb works, back online the network returns; round trip through the console UI with restart |
@@ -128,6 +130,39 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Next steps
 
+0. **Emulator secondary displays** (owner request 2026-11-10, clarified): the
+   emulator's own multi-display feature — Extended Controls → Displays, "Add
+   secondary display (Max 3)" — NOT Android overlay displays. The owner wants
+   the framework to support configuring these. Mechanism and plan:
+   - Emulator supports up to 3 secondary displays via the launch flag
+     `-multidisplay <id> <w> <h> <dpi> [<id> <w> <h> <dpi> …]` (applied at
+     start). The Extended Controls panel also adds/removes them live over
+     gRPC, but that is not persisted and not scriptable through aodm today.
+   - Fits the framework the same way `offline` does: a registry field per
+     image (e.g. `displays = [{w,h,dpi}, …]`), a `Launch` field, the
+     `-multidisplay` args built in BOTH `tools/aodm/crates/aod-core/src/emu.rs`
+     (`args`) and `modules/emulator/module.sh` (next to the offline flags),
+     `aodm` subcommand + registry round-trip, and a console card control.
+     Applies at start, like offline → needs a restart.
+   - This is an **emulator-property change**, so it follows the framework
+     process (architecture.md "How changes are made"): plan → a short design
+     (extend docs/phone-image-manager.md or a new doc) → strict modular
+     development → `adx check` + reviews. **To be done in the Opus 5.5 session.**
+   - NB: on 2026-11-10 an overlay-display experiment (`settings put global
+     overlay_display_devices …`) was tried and **reverted**; it is the wrong
+     layer (Android OS overlays, not emulator displays). The phone is back to
+     a single 1080x2400 display, setting cleared.
+
+0b. **App library** (owner request 2026-11-10): design in
+   [docs/app-library.md](docs/app-library.md), phases L1–L4 in ROADMAP.md.
+   Start with L1 (storage, import/promote/send-back/install, console
+   Libraries page, migration of the Assets `apps/` folder). Test case:
+   Pinterest 14.43.0 on `adx_api37` (installed via Uptodown on the phone,
+   evaluation only, not for deployment). The design doc has had one adversarial
+   review (9 findings) applied: gate evidence copied into artifact records
+   before pipeline runs are pruned, per-package locks with atomic writes,
+   prod protected from gc/rm, sandboxed untrusted-APK decode, signer-change
+   and install-flag handling, and a re-signed baseline for 1-to-1 comparison.
 0. App pipeline, next pieces (owner to choose): "Fix with Claude" (console
    starts headless Claude Code on a failed run, deferred by decision);
    instrumented/UI tests on the phone (connectedAndroidTest) and a scripted

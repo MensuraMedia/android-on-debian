@@ -81,6 +81,42 @@ What a module can use:
   `adx_block_write`, `adx_block_remove`, `adx_block_present`,
   `adx_render_tree`, `adx_local_set`, `adx_run_module`
 
+## How changes are made (plan → design → modular development)
+
+Two tracks, kept separate:
+
+- **Apps built or modified with the framework** (the compose-roborazzi apps,
+  and APKs handled by the app library) follow **app best practices**: their
+  own `CLAUDE.md` and pinned skills, the pipeline's definition of done
+  (`adx pipeline run`), and, for third-party APK work, the engineering
+  practices in [docs/app-library.md](app-library.md) §1.1. This is about the
+  software being produced.
+
+- **Any enhancement or modification to the adx console, the emulator, or
+  their properties** — the framework itself — follows a fixed process, not
+  ad-hoc edits:
+
+  1. **Plan.** Agree the scope and phases first (an approved plan, as the
+     phone-image manager and app library have in ROADMAP.md). No framework
+     feature starts as code.
+  2. **Design.** Write the design down before building — a technical document
+     (e.g. [docs/phone-image-manager.md](phone-image-manager.md),
+     [docs/app-library.md](app-library.md)) that states the modules, config,
+     contracts and limits. The design is reviewed and only then built.
+  3. **Develop under strict modular principles.** Implement to the Modularity
+     rules and Module contract above and the ponytail minimalism in the
+     project `CLAUDE.md`: one capability per module, contract-only between
+     modules, config in `defaults.env`, core stays small, the console and
+     other front ends are thin layers over `adx` CLIs. A change that breaks a
+     rule carries its reason in the commit message.
+  4. **Check and review.** Each phase ends with `adx check` and the
+     adversarial and deployment reviews, with findings fixed or recorded,
+     before it is called done.
+
+This is why console and emulator capabilities live behind `adx` modules and
+CLIs rather than inside the web server or the AVD config: the plan and design
+decide the module boundaries, and development keeps them.
+
 ## Config precedence
 
 1. `config/defaults.env` (committed)

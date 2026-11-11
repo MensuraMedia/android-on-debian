@@ -95,8 +95,33 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   standalone phones (`aod-phone`) with a calls/SMS switchboard.
 - `adx release`, `adx upgrade` with migrations and rollback, `adx new-module`.
 - Remaining technical document sections and diagrams.
+- Emulator secondary displays (owner request 2026-11-10): configure the
+  emulator's own multi-display feature (Extended Controls → Displays, Max 3)
+  from the framework, via a per-image registry field and the `-multidisplay`
+  launch flag, applied at start like `offline`. Design and build pending,
+  following the framework change process.
+- App library (design in `docs/app-library.md`, phases L1–L4 in ROADMAP.md):
+  staged APK libraries (dev / test / prod) per app, provenance and lineage,
+  version-suffixed names (`<label>-<id>-v<version>[+mN]`), open → modify →
+  rebuild → send back to test/dev, a token-saving
+  decompile/recompile utility (`adx apk`) with workspace indexes, a re-signed
+  like-for-like baseline and feed-inspection recipe for 1-to-1 comparison,
+  stage gates, pipeline integration, console Libraries page replacing the
+  Assets "Apps" list. The doc binds the work to the framework modularity
+  rules and module contract (§1.1); `docs/architecture.md` now states the
+  framework change process (plan → design → strict modular development) for
+  any adx-console or emulator enhancement, separate from the app best
+  practices the handled APKs follow.
 
 ### Added
+- `docs/architecture.md` "How changes are made": the framework change process
+  — apps follow app best practices; any enhancement to the adx console, the
+  emulator or their properties is planned, designed in a technical document,
+  then developed under strict modular principles with `adx check` and
+  adversarial/deployment review per phase.
+- `docs/app-library.md`: technical design of the app library (staged APKs,
+  post-APK modification, promotion, console Libraries page); added to the
+  roadmap as phases L1–L4.
 - `docs/app-development-and-release.md`: the needs and requirements of app
   development and release with this environment. It covers:
   - machine, toolchain and app project requirements;
