@@ -30,8 +30,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
 | Installer (2026-11-24) | `adx up [--yes] [profile]` lists what each pending module changes (`MOD_CHANGES`, all 18 modules), logs it, asks `Continue? [Y/n]` on a terminal (declined: exit 2); `adx changes [profile]`. Default profile now ends with `studio` (Android Studio 2026.2.2.10, SHA-256 + build pinned). Guide: [docs/installer.md](docs/installer.md). Verified on the second machine (full `adx up`, prompt in a pty sandbox); two adversarial reviews, all findings fixed |
 | Menu icons (2026-11-24) | Own icons for Android Emulator (`adx-emulator`) and Phone Images (`aod-gui`), shared `adx_icon_*` helpers with install records (`~/.local/state/adx/icons/`); user's own icons never replaced or removed |
-| Branch | `feat/installer-notice-icons-studio` pushed to `origin` (2026-11-24, not merged): installer notice, `studio` installer, menu icons, `adx emulator status` fix, docs. Open a PR / merge into `main` when reviewed |
-| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `14cfa9a`, 2026-11-10; local `main` pulled to it). Since 0.2.0: `a46c1be` app pipeline + offline phones + per-phone logcat + app dev/release docs, `360d7cb` console APK identity fix, `14cfa9a` app-library design + framework change process + emulator multi-display plan. Working tree clean. `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
+| Push | `main` pushed to `MensuraMedia/android-on-debian` (last: 2026-11-24, `df29ebd` installer notice + `adx changes`, Android Studio in `adx up`, own menu icons, fast-forwarded from branch `feat/installer-notice-icons-studio`, which can be deleted on GitHub; plus the handoff commit after it). Earlier: `14cfa9a` (2026-11-10) app-library design + framework change process + emulator multi-display plan; since 0.2.0 also `a46c1be`, `360d7cb`. Working tree clean. `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
 
 ## Second machine (Mint, 12 GiB RAM, 2026-11-24)
@@ -47,7 +46,7 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - Session operations log: `~/.local/state/adx/claude-ops-20261124.log`
   (devices build output: `claude-devices-build-20261124.log`).
 - Menu icons, `MOD_CHANGES` + `adx up` notice/`adx changes` and the
-  `studio` installer are committed on branch `feat/installer-notice-icons-studio` (pushed, not merged).
+  `studio` installer are on `main` (`df29ebd`, pushed 2026-11-24; merged fast-forward from `feat/installer-notice-icons-studio`).
 - Test sandboxes were left in place (owner: no deletes), incl. a git worktree
   of `998f332` under the session scratchpad: `git worktree prune` once that
   folder is gone.
