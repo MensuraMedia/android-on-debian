@@ -1,4 +1,5 @@
 MOD_DESC="Node.js LTS at user level for mobile-mcp (nodejs.org tarball, SHA-256 checked, no sudo)"
+MOD_CHANGES="only if Node.js 20+ is missing: ~/.local/opt/node; replaces links ~/.local/bin/{node,npm,npx}"
 
 _dir()  { echo "$HOME/.local/opt/node-v$ADX_NODE_VERSION-linux-x64"; }
 _link() { echo "$HOME/.local/opt/node"; }

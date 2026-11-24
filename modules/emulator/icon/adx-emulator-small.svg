@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- adx-emulator at 16-24 px (tools/render-icons.sh uses it for those sizes): no window, bigger play -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#1f9e74"/>
+  <rect x="68" y="28" width="120" height="200" rx="24" fill="#ffffff"/>
+  <rect x="84" y="50" width="88" height="156" rx="8" fill="#123a2e"/>
+  <path d="M106 92 L156 128 L106 164 Z" fill="#7fe3b8" stroke="#7fe3b8" stroke-width="12" stroke-linejoin="round"/>
+</svg>

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- adx console app icon (menu, panel, Alt+Tab). After editing, run render-icons.sh. -->
+  <!-- adx console app icon (menu, panel, Alt+Tab). After editing: tools/render-icons.sh tools/console/static/app-icon -->
   <rect x="8" y="8" width="240" height="240" rx="56" fill="#4f6bed"/>
   <!-- the stack: more phone images behind the front one -->
   <rect x="86" y="44" width="84" height="164" rx="18" fill="#ffffff" fill-opacity="0.30" transform="rotate(-16 128 214)"/>

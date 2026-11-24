@@ -1,4 +1,5 @@
 MOD_DESC="Official Android Emulator + AVD (KVM, headless by default; menu entry via: adx emulator desktop)"
+MOD_CHANGES="system image in ~/Android/Sdk; phone image (AVD) in ~/.android/avd/ (sets hw.keyboard in an existing AVD of that name); may write GPU settings to config/local.env"
 
 _emu()  { "$ANDROID_HOME/emulator/emulator" "$@"; }
 _adb()  { "$ANDROID_HOME/platform-tools/adb" "$@"; }
@@ -36,10 +37,11 @@ _logcat_start() {
   adx_log "logcat to $(_logcat_log)"
 }
 # PID of this AVD's emulator process, if one is running.
-_pid()  { pgrep -f "qemu-system-[^ ]* .*-avd $ADX_AVD_NAME( |\$)" | head -1; }
+_pid()  { pgrep -f "qemu-system-[^ ]* .*-avd $ADX_AVD_NAME( |\$)" | head -1 || true; }
 # This AVD's adb serial if adb sees it (console port pinned by ADX_EMU_PORT).
-_serial() { _adb devices 2>/dev/null | awk -v s="emulator-$ADX_EMU_PORT" '$1==s{print $1; exit}'; }
+_serial() { _adb devices 2>/dev/null | awk -v s="emulator-$ADX_EMU_PORT" '$1==s{print $1; exit}' || true; }
 _desktop_file() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/applications/adx-emulator.desktop"; }
+_icon_src()     { echo "$ADX_ROOT/modules/emulator/icon"; }   # theme icon "adx-emulator"
 
 # Hybrid Intel/AMD + NVIDIA laptops (PRIME) are where -gpu host has crashed.
 # Display controllers (PCI class 0x03xxxx) by vendor ID: 10de NVIDIA, 8086 Intel, 1002 AMD.
@@ -86,7 +88,12 @@ mod_status() {
       echo "  last run logged errors: adx logs emulator"
     fi
   fi
-  if [ -f "$(_desktop_file)" ]; then echo "menu entry: $(_desktop_file)"; else echo "menu entry: not installed (adx emulator desktop)"; fi
+  if [ -f "$(_desktop_file)" ]; then
+    echo "menu entry: $(_desktop_file)"
+    if ! adx_icon_current adx-emulator "$(_icon_src)"; then echo "  app icon missing or outdated (adx emulator desktop)"; fi
+  else
+    echo "menu entry: not installed (adx emulator desktop)"
+  fi
   return $rc
 }
 
@@ -220,8 +227,9 @@ mod_stop() {
 mod_desktop() {
   local f; f="$(_desktop_file)"
   if [ "${1:-}" = remove ]; then
-    rm -f "$f"; adx_log "removed $f"; return 0
+    rm -f "$f"; adx_icon_remove adx-emulator "$(_icon_src)"; adx_log "removed $f"; return 0
   fi
+  adx_icon_install adx-emulator "$(_icon_src)"
   mkdir -p "$(dirname "$f")"
   cat > "$f" <<DESKTOP
 [Desktop Entry]
@@ -229,7 +237,7 @@ Type=Application
 Name=Android Emulator
 GenericName=Android Emulator ($ADX_AVD_NAME)
 Comment=Start the adx Android emulator in a window
-Icon=phone
+Icon=adx-emulator
 Exec="$ADX_ROOT/adx" emulator start --window --notify
 Terminal=false
 Categories=Development;

@@ -9,6 +9,29 @@ the project uses [Semantic Versioning](https://semver.org/).
 Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
 
 ### Upgrading from 0.2.0
+- `adx up` now starts by listing what each module it still has to install will
+  change on your system (also written to `adx.log`) and asks `Continue? [Y/n]`
+  on a terminal. Scripts: pass `--yes` or set `ADX_YES=1`; without a terminal
+  it doesn't ask. `adx changes [profile]` prints the list any time. README
+  "What `adx up` changes on your system" lists the edits to `~/.bashrc`,
+  `~/.claude/CLAUDE.md`, `~/.claude/agents/` and `~/.claude.json`.
+- The default profile now installs Android Studio (`studio`, 2026.2.2 Patch 2,
+  build pinned in `ADX_STUDIO_BUILD`, 1.6 GB tarball kept in `~/Downloads/adx`,
+  last in the profile). `adx doctor` therefore fails until it is installed, and
+  an `adx up` whose only failure is the Studio download ends "profile
+  incomplete: studio". Leave it out with a copy of the profile without `studio`.
+  An existing `~/.local/opt/android-studio` of another build is kept as
+  `android-studio.previous-<build>-<time>`, never deleted.
+- `adx up` takes `[--yes] [profile]` (one profile; `--` ends options) and exits
+  with code 2 when you decline the prompt.
+- The Android Emulator and Phone Images menu entries have their own icons
+  (`adx-emulator`, `aod-gui`) instead of the generic `phone` theme icon. Run
+  `adx emulator desktop` and `adx devices install` to update entries already
+  installed. Icons are installed in `~/.local/share/icons/hicolor/*/apps/` and
+  recorded in `~/.local/state/adx/icons/`. An icon of the same name that you
+  made yourself is left alone (`ADX_FORCE=1` replaces it). `adx emulator
+  desktop remove`, `adx devices remove` and `adx console remove` delete only
+  adx's files.
 - `./adx up` now also runs the `console` module (default profile): it installs
   the "adx console" menu entry and its icon (`~/.local/share/icons/hicolor/*/apps/adx-console.*`);
   nothing is downloaded (Python standard library). `adx console start` serves
@@ -114,6 +137,20 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   practices the handled APKs follow.
 
 ### Added
+- Module contract: `MOD_CHANGES`, one line on what installing the module
+  changes on the user's system; set for all 18 modules. Shown by the `adx up`
+  notice and `adx changes`.
+- `adx studio install` installs Android Studio from the official tarball
+  (`ADX_STUDIO_VERSION`, `ADX_STUDIO_URL`, `ADX_STUDIO_SHA256` in
+  `config/defaults.env`, SHA-256 checked); `adx studio launch` logs to
+  `~/.local/state/adx/studio.log`.
+- Own menu icons for Android Emulator (`adx-emulator`: green, phone with a
+  play button in a desktop window) and Phone Images (`aod-gui`: violet, a row
+  of phone cards), in the console icon's style. Shared helpers
+  `adx_icon_install`/`adx_icon_remove`/`adx_icon_current` (`lib/common.sh`) serve all
+  three modules. `tools/render-icons.sh [dir…]` (moved out of the console's
+  served `static/` folder) renders every icon set, using `NAME-small.svg` for
+  16–24 px where present.
 - `docs/architecture.md` "How changes are made": the framework change process
   — apps follow app best practices; any enhancement to the adx console, the
   emulator or their properties is planned, designed in a technical document,
@@ -369,6 +406,9 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   boot flags, identity fields, copies, locks, calls/SMS), measured on API 37.
 
 ### Fixed
+- `adx emulator status` stopped after the version lines when no emulator was
+  running (`pgrep` failing under `pipefail`): "running: no" and the menu entry
+  line now print.
 - Console Assets, Apps (APK): a library APK showed only its file name, so a
   file named after one app but containing another went unnoticed (seen:
   `uptodown-com.brave.browser.apk` is the Uptodown store, `com.uptodown`;
@@ -546,6 +586,15 @@ Status of everything below and of planned work: [ROADMAP.md](ROADMAP.md).
   its own serial and fails with a clear message.
 
 ### Changed
+- `tools/console/static/app-icon/render-icons.sh` moved to
+  `tools/render-icons.sh [dir…]` (out of the console's served `static/`
+  folder); it renders every icon folder.
+- The console module installs its icon through the shared
+  `adx_icon_install`/`adx_icon_remove` helpers (same files and paths as before;
+  icons installed by an older version are still removed by content).
+- `adx help` prints the whole header block (it cut off `logs` and `check`).
+- New guide [docs/installer.md](docs/installer.md): `adx up`, the notice and
+  prompt, exit codes, what changes, menu entries and icons, Android Studio, logs.
 - aodm reads configuration with adx's precedence: config files win over the
   process environment (as in adx); only keys written as `${VAR:-default}`
   honour the environment. `aodm env` warns about ignored environment values.

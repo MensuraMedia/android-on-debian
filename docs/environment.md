@@ -31,13 +31,15 @@ Paste both into bug reports and handoffs.
 | `~/Android/Sdk/` | Android SDK: cmdline-tools, platform-tools, platforms, build-tools, emulator, system images (`ANDROID_HOME`) | `sdk`, `emulator` modules |
 | `~/.android/avd/adx_api37.avd/` | The emulator's virtual device (user data, snapshots) | `emulator` module |
 | `~/.local/opt/node/`, `~/.local/bin/{node,npm,npx}` | Node.js (for mobile-mcp) | manual, see troubleshooting |
-| `~/.local/opt/android-studio/` | Android Studio, dormant | `studio` module (manual) |
-| `~/.local/state/adx/` | **All framework logs** (`ADX_LOG_DIR`) | `adx` |
+| `~/.local/opt/android-studio/` | Android Studio, dormant (launch log `~/.local/state/adx/studio.log`) | `studio` module |
+| `~/.local/state/adx/` | **All framework logs** (`ADX_LOG_DIR`); `icons/<name>.sha256` records which icon files adx installed | `adx` |
 | `~/Downloads/adx/` | Downloads cache and screenshots (`ADX_DOWNLOADS`) | `adx` |
 | `~/.bashrc` block `adx:shell-env` | Sources `lib/shell-env.sh`: `ANDROID_HOME`, `JAVA_HOME`, `PATH` | `shell-env` module |
 | `~/.claude.json` (user scope) | mobile-mcp MCP server registration | `mobile-mcp` module |
 | `~/.claude/CLAUDE.md` block `adx:claude-rules` | Global rules: changelog, handoff, logging, Android notes | `claude-rules` module |
 | `~/.local/share/applications/adx-emulator.desktop` | Menu entry: Programming → Android Emulator | `adx emulator desktop` |
+| `~/.local/share/applications/{adx-console,aod-gui}.desktop` | Menu entries: adx console, Phone Images | `console`, `devices` modules |
+| `~/.local/share/icons/hicolor/*/apps/{adx-console,adx-emulator,aod-gui}.*` | Menu entry icons (sources: `tools/console/static/app-icon/`, `modules/emulator/icon/`, `modules/devices/icon/`; PNGs from `tools/render-icons.sh`) | `console`, `emulator`, `devices` modules |
 | `~/projects-backups/` | Local backups: mirror folders + dated `.tar.gz` | manual (see §8) |
 | `~/.claude/agents/adversarial-reviewer.md` | Read-only adversarial review agent | `claude-rules` module |
 
@@ -60,6 +62,9 @@ Key settings:
 | `ADX_LOG_DIR` | `~/.local/state/adx` | Framework and emulator logs |
 | `ADX_LOG_MAX_KB` / `ADX_LOG_KEEP` | `5120` / `5` | `adx.log` rotation size and number of old logs kept |
 | `ADX_MCP_SCOPE` | `user` | mobile-mcp available in every project |
+| `ADX_STUDIO_VERSION` / `ADX_STUDIO_BUILD` | `2026.2.2.10` / `262.10968.63.2622.16975389` | Android Studio pinned by the `studio` module; with `ADX_STUDIO_URL` and `ADX_STUDIO_SHA256`, update all four together |
+| `ADX_YES` | unset | `1` = `adx up` doesn't ask before installing (same as `--yes`); set it in the shell, not in `local.env` |
+| `ADX_FORCE` | unset | `1` = replace a binary or icon that adx didn't install (`devices`, menu icons) |
 
 ### This machine (hybrid-GPU laptop, `config/local.env`)
 

@@ -1,4 +1,5 @@
 MOD_DESC="Claude Code permission allowlist for Android app projects (.claude/settings.json)"
+MOD_CHANGES="this repo's .claude/settings.json: merges the permission allowlist (existing rules kept)"
 
 _tpl() { echo "$ADX_ROOT/templates/claude/settings.json"; }
 

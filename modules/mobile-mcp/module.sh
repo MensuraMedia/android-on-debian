@@ -1,4 +1,5 @@
 MOD_DESC="mobile-mcp MCP server registered in Claude Code (drives emulator/device)"
+MOD_CHANGES="edits ~/.claude.json: registers the mobile-mcp MCP server for Claude Code (restart Claude Code afterwards)"
 
 _pkg() { echo "@mobilenext/mobile-mcp@$ADX_MOBILE_MCP_VERSION"; }
 

@@ -53,7 +53,8 @@ git clone https://github.com/MensuraMedia/android-on-debian.git
 cd android-on-debian
 ./adx system status      # preflight: prints the one sudo command if anything is missing
 sudo usermod -aG kvm $USER   # once, then log out and back in (KVM for the emulator)
-./adx up                 # provision everything in profiles/default.profile
+./adx changes            # what each module will change on your system (read this first)
+./adx up                 # provision everything in profiles/default.profile (lists the changes, asks once)
 exec bash                # reload ~/.bashrc (adds ANDROID_HOME, PATH, adx)
 
 adx app-template new HelloApp com.example.helloapp
@@ -67,6 +68,34 @@ adx emulator stop
 ```
 
 Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
+
+### What `adx up` changes on your system
+
+Before it installs anything, `adx up` lists every module it still has to
+install with what that module changes, writes the list to `adx.log` and asks
+`Continue? [Y/n]` (`--yes` or `ADX_YES=1` skips the question; without a
+terminal it doesn't ask; declining exits with code 2 and changes nothing).
+`adx changes` prints the same list any time. Nothing needs root. Besides tools
+installed under `~/.local`, `~/Android` and `~/.cargo`, and downloads kept in
+`~/Downloads/adx` (about 2.5 GB, 1.6 GB of it Android Studio), these are the
+changes to files you may already have:
+
+| File | Change | Module | Undo |
+| --- | --- | --- | --- |
+| `~/.bashrc` | Adds a marked `adx:shell-env` block that sets `ANDROID_HOME`, `JAVA_HOME` and `PATH`; links `~/.local/bin/adx` | `shell-env` | `adx shell-env remove` |
+| `~/.claude/CLAUDE.md` | Inserts (or refreshes) a marked `adx:claude-rules` block of global rules at the top; the rest of the file is kept | `claude-rules` | `adx claude-rules remove` |
+| `~/.claude/agents/` | Adds the `adversarial-reviewer` and `deploy-reviewer` agents; an edited copy of yours is kept as `.bak` | `claude-rules` | `adx claude-rules remove` |
+| `~/.diagram-design/profiles/` | Installs the flat-dark diagram profile; an edited copy of yours is kept as `.bak` | `skills` | delete the file |
+| `~/.local/bin/{node,npm,npx}` | Replaces these links, only when Node.js 20+ is missing | `node` | relink your own Node |
+| `~/.local/opt/jdk-21`, `~/.local/opt/android-studio` | Replaced by the pinned versions (an Android Studio of another build is kept as `android-studio.previous-<build>-<time>`) | `jdk`, `studio` | — |
+| `~/.android/avd/adx_api37.avd/config.ini` | Sets `hw.keyboard` if an AVD of that name already exists | `emulator` | edit the file |
+| `~/.claude.json` | Registers the `mobile-mcp` MCP server (user scope) | `mobile-mcp` | `adx mobile-mcp remove` |
+| `~/.local/share/applications/`, `~/.local/share/icons/hicolor/` | Menu entries and icons: adx console, Android Emulator, Phone Images | `console`, `emulator`, `devices` | `adx console remove`, `adx emulator desktop remove`, `adx devices remove` |
+| `config/local.env` (this repo) | Emulator GPU settings, on hybrid-GPU laptops only | `emulator` | edit the file |
+
+Every path is listed in [docs/environment.md](docs/environment.md); the
+installer, its prompt, exit codes, menu entries, icons and logs are described
+in [docs/installer.md](docs/installer.md).
 
 ## Requirements
 
@@ -95,20 +124,21 @@ Restart Claude Code once after `./adx up` so it loads the mobile-mcp server.
 | `mobile-mcp` | `@mobilenext/mobile-mcp` registered in Claude Code | `~/.claude.json` (user scope) |
 | `rust` | Rust toolchain (pinned, via rustup) | `~/.cargo`, `~/.rustup` |
 | `devtools` | ShellCheck, cargo-deny (pinned), optional pre-commit hook | `~/.local/opt`, `~/.local/bin` |
-| `devices` | Builds and installs `aodm`, the phone image manager (`adx devices run <args>`) | `~/.local/bin/aodm` |
+| `devices` | Builds and installs `aodm`, the phone image manager (`adx devices run <args>`), and its window `aod-gui` (menu: Phone Images) | `~/.local/bin/aodm`, `~/.local/bin/aod-gui` |
 | `claude-permissions` | Permission allowlist template | `<project>/.claude/settings.json` |
 | `claude-rules` | Global rules (changelog, handoff, logging) and the `adversarial-reviewer` agent | `~/.claude/CLAUDE.md` block, `~/.claude/agents/` |
 | `skills` | Pinned design and code skills (below) | `<app>/.claude/skills/` |
 | `app-template` | Compose + Roborazzi app scaffolder | `~/projects/android-apps/<Name>` |
 | `console` | Local web console (`adx console start`): phone images, apps, modules, skills, activity, settings | menu entry; `tools/console/` (Python stdlib) |
-| `studio` | Nothing; reports on the dormant Android Studio install | `~/.local/opt/android-studio` |
+| `studio` | Android Studio 2026.2.2 Patch 2 (official tarball, SHA-256 verified, 1.6 GB), dormant: no menu entry, `adx studio launch` | `~/.local/opt/android-studio` |
 
 ## Using `adx`
 
 ```text
 adx list                         modules, descriptions and status
 adx doctor                       detailed status of every module
-adx up [profile]                 install every module in a profile (default: default)
+adx up [--yes] [profile]         install every module in a profile (default: default); lists the changes and asks first
+adx changes [profile]            what each module of a profile changes on your system
 adx <module> [action] [args...]  run one module action (default: status)
 adx <module> help                list a module's actions
 adx env                          versions, paths and machine facts
@@ -246,7 +276,8 @@ ROADMAP.md               shipped, pending and future features
 ## Extending
 
 - **New module:** create `modules/<name>/module.sh` with `MOD_DESC`,
-  `mod_status` and `mod_install`. Any other `mod_<action>` function becomes
+  `MOD_CHANGES` (what installing it changes on the user's system, shown by
+  `adx up` and `adx changes`), `mod_status` and `mod_install`. Any other `mod_<action>` function becomes
   `adx <name> <action>` automatically. Add it to a profile if `adx up` should
   install it.
 - **New app template:** add `templates/<name>/` using `@@VAR@@` placeholders

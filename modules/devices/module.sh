@@ -1,4 +1,5 @@
 MOD_DESC="Phone image manager aodm + its window aod-gui (Rust): build with the pinned toolchain, install to ~/.local/bin, menu entry"
+MOD_CHANGES="aodm and aod-gui in ~/.local/bin (install markers in ~/.local/state); menu entry Phone Images + icon (~/.local/share/applications, icons/hicolor); phone data in ~/.local/share/aod; build cache in tools/aodm/target and ~/.cargo/registry"
 
 _ws()     { echo "$ADX_ROOT/tools/aodm"; }
 _BINS="aodm aod-gui"
@@ -6,6 +7,7 @@ _bin()    { echo "$HOME/.local/bin/${1:-aodm}"; }
 # Marker proving the installed binary is adx's: its SHA-256, written at install.
 _marker() { echo "$ADX_LOG_DIR/../${1:-aodm}.installed"; }
 _desktop_file() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/applications/aod-gui.desktop"; }
+_icon_src()     { echo "$ADX_ROOT/modules/devices/icon"; }   # theme icon "aod-gui" (window app_id aod-gui)
 _ver()    { sed -nE '/^\[workspace.package\]/,/^\[/{s/^version = "([^"]+)"/\1/p}' "$(_ws)/Cargo.toml"; }
 
 # True if ~/.local/bin/NAME (default aodm) is the one adx installed (unchanged since).
@@ -34,6 +36,10 @@ mod_status() {
   fi
   case "$("$g" --version 2>/dev/null)" in "aod-gui ${v#aodm }") ;; *) echo "  aod-gui is another build than aodm (adx devices install)"; return 1 ;; esac
   echo "aod-gui: $g (menu: Phone Images)"
+  local rc=0
+  if _desktop_ours && ! adx_icon_current aod-gui "$(_icon_src)"; then
+    echo "  app icon missing or outdated (adx devices install)"; rc=1
+  fi
   # Loaded at run time (the build needs no -dev packages); a warning, not a failure.
   # ldconfig lives in /sbin, often not on a user's PATH. Read whole (grep -q under
   # pipefail would fail on ldconfig's SIGPIPE).
@@ -41,6 +47,7 @@ mod_status() {
   for lib in libxkbcommon.so.0 libEGL.so.1; do
     grep -qF "$lib" <<<"$libs" || echo "  warning: $lib not found: the window may not open (install it with your package manager)"
   done
+  return "$rc"
 }
 
 # Release build (locked, pinned target dir), then install atomically.
@@ -82,6 +89,7 @@ _desktop_ours() { grep -qx 'X-Adx-Managed=true' "$(_desktop_file)" 2>/dev/null; 
 _desktop() {
   local f; f="$(_desktop_file)"
   if [ -e "$f" ] && ! _desktop_ours; then adx_warn "$f is not adx's; menu entry left alone"; return 0; fi
+  adx_icon_install aod-gui "$(_icon_src)"
   mkdir -p "$(dirname "$f")"
   # Staged under a hidden name that still ends in .desktop (the validator requires it).
   local tmp; tmp="$(dirname "$f")/.aod-gui.new.desktop"
@@ -91,7 +99,7 @@ Type=Application
 Name=Phone Images
 GenericName=Android phone image manager (aodm)
 Comment=See every adx phone image with a live screen thumbnail; start, stop, save, clone
-Icon=phone
+Icon=aod-gui
 Exec="$(_bin aod-gui)"
 Terminal=false
 Categories=Development;
@@ -117,6 +125,7 @@ mod_remove() {
   done
   for n in $_BINS; do rm -f "$(_bin "$n")" "$(_marker "$n")"; done
   if _desktop_ours; then rm -f "$(_desktop_file)"; fi
+  adx_icon_remove aod-gui "$(_icon_src)"
   adx_log "removed $_BINS and the menu entry (images, saves and $ADX_AOD_HOME untouched)"
 }
 

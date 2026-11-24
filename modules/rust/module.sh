@@ -1,4 +1,5 @@
 MOD_DESC="Rust toolchain at user level via rustup (pinned rustup-init, SHA-256 checked, no sudo)"
+MOD_CHANGES="rustup and the pinned toolchain in ~/.cargo and ~/.rustup (an existing rustup is reused)"
 
 _rustup() { CARGO_HOME="$ADX_CARGO_HOME" "$ADX_CARGO_HOME/bin/rustup" "$@"; }
 _tc()     { echo "$ADX_RUST_TOOLCHAIN-x86_64-unknown-linux-gnu"; }

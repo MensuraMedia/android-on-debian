@@ -1,4 +1,5 @@
 MOD_DESC="App pipeline: build, lint, test, deploy and smoke-test an app on the emulator (adx pipeline run <App>)"
+MOD_CHANGES="none (run records go to ~/.local/share/adx/pipeline when used)"
 
 _py() { echo "$ADX_ROOT/tools/pipeline/pipeline.py"; }
 

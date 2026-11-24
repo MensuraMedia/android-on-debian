@@ -1,4 +1,5 @@
 MOD_DESC="Pinned third-party Claude Code skills (config/skills.manifest) vendored into app projects"
+MOD_CHANGES="edits ~/.diagram-design/profiles: installs diagram profiles (your edited copies kept as .bak); skill sources cached in ~/Downloads/adx/skills-src"
 
 _manifest() { echo "${ADX_SKILLS_MANIFEST:-$ADX_ROOT/config/skills.manifest}"; }
 _cache()    { echo "$ADX_DOWNLOADS/skills-src"; }

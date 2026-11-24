@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- adx Android Emulator app icon (menu entry). After editing: tools/render-icons.sh modules/emulator/icon -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#1f9e74"/>
+  <!-- the desktop window the phone runs in -->
+  <rect x="30" y="70" width="196" height="126" rx="16" fill="#ffffff" fill-opacity="0.28"/>
+  <circle cx="50" cy="88" r="6" fill="#ffffff" fill-opacity="0.6"/>
+  <circle cx="68" cy="88" r="6" fill="#ffffff" fill-opacity="0.6"/>
+  <!-- the phone -->
+  <rect x="86" y="40" width="84" height="168" rx="18" fill="#ffffff"/>
+  <rect x="96" y="58" width="64" height="122" rx="7" fill="#123a2e"/>
+  <rect x="117" y="47" width="22" height="5" rx="2.5" fill="#bfe8d8"/>
+  <rect x="116" y="191" width="24" height="6" rx="3" fill="#bfe8d8"/>
+  <!-- play: start the emulator -->
+  <path d="M116 97 L148 119 L116 141 Z" fill="#7fe3b8" stroke="#7fe3b8" stroke-width="6" stroke-linejoin="round"/>
+</svg>

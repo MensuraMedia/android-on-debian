@@ -1,4 +1,5 @@
 MOD_DESC="Android SDK: cmdline-tools, platform-tools, platform, build-tools"
+MOD_CHANGES="installs the Android SDK in ~/Android/Sdk (ANDROID_HOME)"
 
 _sdkm() { "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$@"; }
 

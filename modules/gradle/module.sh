@@ -1,4 +1,5 @@
 MOD_DESC="Bootstrap Gradle distribution (only used to generate wrappers in new apps)"
+MOD_CHANGES="installs ~/.local/opt/gradle (download cache ~/Downloads/adx)"
 
 _gradle_home() { echo "$HOME/.local/opt/gradle/gradle-$ADX_GRADLE_VERSION"; }
 

@@ -62,6 +62,17 @@ adx_module_desc() {
   grep -m1 '^MOD_DESC=' "$ADX_ROOT/modules/$1/module.sh" | cut -d= -f2- | tr -d '"'
 }
 
+# What installing the module changes on the user's system (module contract: MOD_CHANGES).
+adx_module_changes() {
+  local c=""
+  if [ -f "$ADX_ROOT/modules/$1/module.sh" ]; then
+    c="$(grep -m1 '^MOD_CHANGES=' "$ADX_ROOT/modules/$1/module.sh" | cut -d= -f2- | tr -d '"' || true)"
+  else
+    c="(no such module)"
+  fi
+  echo "${c:-not declared by the module (read modules/$1/module.sh)}"
+}
+
 # Run one action of a module in a subshell so modules cannot leak state.
 # Contract: modules/<name>/module.sh defines MOD_DESC and functions
 # mod_status (0 = ok) and mod_install; any mod_<action> is a public action.
@@ -147,3 +158,58 @@ adx_local_set() {
   printf '\n# %s (set by adx on %s)\n%s=%q\n' "$3" "$(date +%F)" "$1" "$2" >> "$f"
   adx_logfile INFO "local.env: $1=\"$2\""
 }
+
+# App icons for menu entries: SRC holds NAME.svg plus one PNG per size (<size>.png,
+# from tools/render-icons.sh), installed into the user's hicolor theme as NAME so a
+# menu entry's Icon=NAME finds it (menu, and panel/Alt+Tab via StartupWMClass).
+# What adx installed is recorded (SHA-256 per file) so a user's own icon of that name is
+# never replaced (unless ADX_FORCE=1) and remove takes only adx's files.
+#   adx_icon_install <name> <src-dir>   adx_icon_remove <name> <src-dir>   adx_icon_current <name> <src-dir>
+ADX_ICON_SIZES="16 22 24 32 48 64 128 256 512"
+adx_icon_theme()    { echo "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"; }
+_adx_icon_record()  { echo "$ADX_LOG_DIR/icons/$1.sha256"; }
+# Lines "<source> <destination>" for every file of icon NAME.
+_adx_icon_files() {
+  local s theme; theme="$(adx_icon_theme)"
+  for s in $ADX_ICON_SIZES; do echo "$2/$s.png $theme/${s}x${s}/apps/$1.png"; done
+  echo "$2/$1.svg $theme/scalable/apps/$1.svg"
+}
+# True if FILE is unchanged since adx installed it as icon NAME.
+_adx_icon_ours() { [ -f "$2" ] && grep -qxF "$(sha256sum "$2")" "$(_adx_icon_record "$1")" 2>/dev/null; }
+
+adx_icon_install() {
+  local name="$1" src="$2" theme from to; theme="$(adx_icon_theme)"
+  while read -r from to; do
+    if [ -e "$to" ] && ! cmp -s "$from" "$to" && ! _adx_icon_ours "$name" "$to" && [ "${ADX_FORCE:-0}" != 1 ]; then
+      adx_warn "$to is not adx's; icon $name left alone (ADX_FORCE=1 replaces it)"; return 0
+    fi
+  done < <(_adx_icon_files "$name" "$src")
+  mkdir -p "$(dirname "$(_adx_icon_record "$name")")"
+  : > "$(_adx_icon_record "$name").new"
+  while read -r from to; do
+    mkdir -p "$(dirname "$to")"
+    install -m644 "$from" "$to"
+    sha256sum "$to" >> "$(_adx_icon_record "$name").new"
+  done < <(_adx_icon_files "$name" "$src")
+  mv -f "$(_adx_icon_record "$name").new" "$(_adx_icon_record "$name")"
+  touch "$theme"   # icon caches and the desktop notice the change
+  if adx_have gtk-update-icon-cache && [ -f "$theme/index.theme" ]; then
+    gtk-update-icon-cache -q -t -f "$theme" 2>/dev/null || true
+  fi
+  adx_log "installed icon $name into $theme"
+}
+
+# Removes only files adx installed and nobody changed since (installs without a record,
+# from before it existed: only files identical to the sources).
+adx_icon_remove() {
+  local name="$1" src="$2" from to
+  while read -r from to; do
+    if _adx_icon_ours "$name" "$to" || { [ ! -f "$(_adx_icon_record "$name")" ] && cmp -s "$from" "$to"; }; then
+      rm -f "$to"
+    fi
+  done < <(_adx_icon_files "$name" "$src")
+  rm -f "$(_adx_icon_record "$name")"
+}
+
+# True if the installed icon matches the sources (checked on the 48 px PNG).
+adx_icon_current() { cmp -s "$(adx_icon_theme)/48x48/apps/$1.png" "$2/48.png"; }

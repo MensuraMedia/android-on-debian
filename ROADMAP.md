@@ -16,7 +16,7 @@ needed** (waiting for the owner).
 | Area | Features |
 | --- | --- |
 | Core | `adx list`, `doctor`, `up [profile]`, `<module> <action>`; module contract; config in `defaults.env` + git-ignored `local.env`; `@@VAR@@` templating; managed `~/.bashrc` block |
-| Toolchain modules | `jdk` (Temurin 21, SHA-256), `shell-env`, `sdk` (cmdline-tools, platform 37, build-tools 37), `emulator` (AVD `adx_api37`, headless start/stop, screenshot, accel), `gradle` (wrapper bootstrap), `studio` (dormant) |
+| Toolchain modules | `jdk` (Temurin 21, SHA-256), `shell-env`, `sdk` (cmdline-tools, platform 37, build-tools 37), `emulator` (AVD `adx_api37`, headless start/stop, screenshot, accel), `gradle` (wrapper bootstrap), `studio` (dormant; installed by `adx up` since 2026-11-24, SHA-256 pinned) |
 | Claude Code | `mobile-mcp` 1.0.16 (user scope), `claude-permissions` allowlist template, pinned `skills` (hallmark, swiftui-pro, autoresearch, ponytail set) |
 | Apps | `compose-roborazzi` template (AGP 9.5.1, Kotlin 2.4.21, Compose BOM, Roborazzi, Robolectric); `adx app-template new` |
 | Profiles | `default`, `render-only` |

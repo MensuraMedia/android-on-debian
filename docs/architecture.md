@@ -64,6 +64,7 @@ needs a reason in the commit message.
 ```bash
 # modules/<name>/module.sh — sourced by adx_run_module in a subshell
 MOD_DESC="One-line description shown by adx list"
+MOD_CHANGES="What installing it changes on the user's system (adx up notice, adx changes)"
 
 mod_status()  { ...; }   # print state; return 0 when installed/healthy
 mod_install() { ...; }   # make mod_status succeed; must be idempotent

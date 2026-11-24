@@ -1,4 +1,5 @@
 MOD_DESC="Scaffold a Compose + Roborazzi app from templates/ (adx app-template new <Name> <package>)"
+MOD_CHANGES="none"
 
 mod_status() {
   local t

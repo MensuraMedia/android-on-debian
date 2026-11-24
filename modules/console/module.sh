@@ -1,4 +1,5 @@
 MOD_DESC="Local web console (adx console start): phone images, assets, apps, modules, skills, activity, settings"
+MOD_CHANGES="menu entry adx console + icon (~/.local/share/applications, icons/hicolor)"
 
 _server()  { echo "$ADX_ROOT/tools/console/server.py"; }
 _url()     { echo "http://$ADX_CONSOLE_HOST:$ADX_CONSOLE_PORT"; }
@@ -8,8 +9,6 @@ _desktop_file() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/applications/adx-co
 # App icon: one artwork for the menu entry (hicolor theme icon "adx-console"), and the
 # window (the page favicon, which Chromium's --app window shows in the panel and Alt+Tab).
 _icon_src()   { echo "$ADX_ROOT/tools/console/static/app-icon"; }
-_icon_theme() { echo "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"; }
-_ICON_SIZES="16 22 24 32 48 64 128 256 512"
 
 # Our server answers /api/health with app "adx console" (another app may hold the port).
 _running() { curl -fsS --max-time 2 "$(_url)/api/health" 2>/dev/null | grep -q '"adx console"'; }
@@ -26,8 +25,8 @@ mod_status() {
   local rc=0
   if adx_have python3; then echo "python3: $(python3 --version 2>&1)"; else echo "python3 missing"; rc=1; fi
   if [ -f "$(_desktop_file)" ]; then echo "menu entry: $(_desktop_file)"; else echo "menu entry missing (adx console install)"; rc=1; fi
-  if ! cmp -s "$(_icon_theme)/48x48/apps/adx-console.png" "$(_icon_src)/48.png"; then
-    echo "app icon missing or outdated in $(_icon_theme) (adx console install)"; rc=1
+  if ! adx_icon_current adx-console "$(_icon_src)"; then
+    echo "app icon missing or outdated in $(adx_icon_theme) (adx console install)"; rc=1
   fi
   if _running; then echo "running: $(_url) (pid $(_pid))"; else echo "not running (adx console start)"; fi
   return "$rc"
@@ -37,7 +36,7 @@ mod_status() {
 # applications-menu entry (Development -> adx console).
 mod_install() {
   adx_have python3 || adx_die "python3 not found (install it with your package manager)"
-  _icons
+  adx_icon_install adx-console "$(_icon_src)"
   local f; f="$(_desktop_file)"
   mkdir -p "$(dirname "$f")"
   cat > "$f" <<DESKTOP
@@ -64,37 +63,9 @@ DESKTOP
   adx_log "installed menu entry $f (start: adx console start)"
 }
 
-# Install the app icon into the user's hicolor theme as "adx-console" (PNG per size + SVG).
-_icons() {
-  local s d theme; theme="$(_icon_theme)"
-  for s in $_ICON_SIZES; do
-    d="$theme/${s}x${s}/apps"
-    mkdir -p "$d"
-    install -m644 "$(_icon_src)/$s.png" "$d/adx-console.png"
-  done
-  mkdir -p "$theme/scalable/apps"
-  install -m644 "$(_icon_src)/adx-console.svg" "$theme/scalable/apps/adx-console.svg"
-  touch "$theme"   # icon caches and the desktop notice the change
-  if adx_have gtk-update-icon-cache && [ -f "$theme/index.theme" ]; then
-    gtk-update-icon-cache -q -t -f "$theme" 2>/dev/null || true
-  fi
-  adx_log "installed icon adx-console into $theme"
-}
-
-# Remove only icon files identical to adx's sources (a user's own adx-console icon stays).
-_icons_remove() {
-  local s f theme; theme="$(_icon_theme)"
-  for s in $_ICON_SIZES; do
-    f="$theme/${s}x${s}/apps/adx-console.png"
-    if cmp -s "$f" "$(_icon_src)/$s.png"; then rm -f "$f"; fi
-  done
-  f="$theme/scalable/apps/adx-console.svg"
-  if cmp -s "$f" "$(_icon_src)/adx-console.svg"; then rm -f "$f"; fi
-}
-
 mod_remove() {
   mod_stop
-  _icons_remove
+  adx_icon_remove adx-console "$(_icon_src)"
   rm -f "$(_desktop_file)"
   adx_log "removed $(_desktop_file)"
 }

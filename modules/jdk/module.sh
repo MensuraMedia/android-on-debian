@@ -1,4 +1,5 @@
 MOD_DESC="Full JDK for Gradle/AGP (user-level Eclipse Temurin, no sudo)"
+MOD_CHANGES="replaces ~/.local/opt/jdk-21 (download cache ~/Downloads/adx)"
 
 mod_status() {
   if [ -x "$ADX_JAVA_HOME/bin/javac" ]; then

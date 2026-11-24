@@ -1,4 +1,5 @@
 MOD_DESC="Developer tools for adx check: ShellCheck and cargo-deny (pinned, SHA-256) and a pre-commit hook"
+MOD_CHANGES="ShellCheck and cargo-deny in ~/.local/opt, links in ~/.local/bin"
 
 _opt() { echo "$HOME/.local/opt/$1-$2"; }
 

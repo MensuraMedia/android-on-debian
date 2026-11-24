@@ -1,4 +1,5 @@
 MOD_DESC="Global Claude Code rules (~/.claude/CLAUDE.md block) and agents (~/.claude/agents/, e.g. adversarial-reviewer)"
+MOD_CHANGES="edits ~/.claude/CLAUDE.md: inserts or refreshes a marked adx:claude-rules block at the top (rest kept); ~/.claude/agents/: adversarial-reviewer.md, deploy-reviewer.md (your edited copies kept as .bak)"
 
 _src()    { echo "$ADX_ROOT/config/claude-global-rules.md"; }
 _target() { echo "${ADX_CLAUDE_GLOBAL_MD:-$HOME/.claude/CLAUDE.md}"; }

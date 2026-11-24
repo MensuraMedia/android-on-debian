@@ -1,4 +1,5 @@
 MOD_DESC="ANDROID_HOME, JAVA_HOME and SDK tools on PATH via a managed ~/.bashrc block"
+MOD_CHANGES="edits ~/.bashrc: adds a marked adx:shell-env block (ANDROID_HOME, JAVA_HOME, PATH); link ~/.local/bin/adx"
 
 ADX_BASHRC="${ADX_BASHRC:-$HOME/.bashrc}"
 # adx for shells that never read ~/.bashrc's interactive part (Claude Code's tool shell,

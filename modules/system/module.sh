@@ -1,4 +1,5 @@
 MOD_DESC="Preflight: system packages, CPU virtualisation, KVM, RAM, disk (prints the sudo commands it needs)"
+MOD_CHANGES="none: checks only (prints any sudo command for you to run yourself)"
 
 # command -> Debian/Ubuntu package. Required for adx itself.
 _REQUIRED="bash:bash curl:curl wget:wget unzip:unzip git:git jq:jq perl:perl tar:tar xz:xz-utils sha256sum:coreutils awk:gawk pgrep:procps cc:build-essential"

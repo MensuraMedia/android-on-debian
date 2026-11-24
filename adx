@@ -4,7 +4,10 @@
 #
 #   adx list                         modules, descriptions and status
 #   adx doctor [profile]             status of every module (non-zero if a profile module fails)
-#   adx up [profile]                 install every module in a profile (default: default)
+#   adx up [--yes] [profile]         install every module in a profile (default: default); first lists
+#                                    what it will change on your system and asks (--yes or ADX_YES=1
+#                                    skips; declining exits 2)
+#   adx changes [profile]            what each module of a profile changes on your system
 #   adx <module> [action] [args...]  run one module action (default action: status)
 #   adx <module> help                actions a module provides
 #   adx env                          versions, paths and machine facts (for docs/bug reports)
@@ -30,7 +33,8 @@ adx_logfile START "adx $* (cwd: $PWD)"
 trap 'adx_logfile END "exit $?"' EXIT
 
 adx_usage() {
-  sed -n '2,12p' "$ADX_ROOT/adx" | sed 's/^# \{0,1\}//'
+  # The header comment block (line 2 up to the first non-comment line).
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$ADX_ROOT/adx"
 }
 
 adx_cmd_logs() {
@@ -99,7 +103,7 @@ adx_cmd_list() {
 }
 
 # Shows every module; only modules in the profile (default: default) affect the exit code,
-# so optional ones like studio don't fail it.
+# so modules left out of a profile (e.g. studio in render-only) don't fail it.
 adx_cmd_doctor() {
   local m rc=0 profile="$ADX_ROOT/profiles/${1:-default}.profile"
   [ -f "$profile" ] || adx_die "no profile '${1:-default}' (see profiles/)"
@@ -113,10 +117,61 @@ adx_cmd_doctor() {
   return $rc
 }
 
+# Modules of a profile, in install order (comments and blank lines dropped).
+adx_profile_modules() {
+  local file="$ADX_ROOT/profiles/$1.profile"
+  [ -f "$file" ] || adx_die "no profile '$1' (see profiles/)"
+  sed 's/#.*//' "$file" | xargs -n1
+}
+
+# adx changes [profile]: what every module of the profile changes on the system.
+adx_cmd_changes() {
+  local m mods
+  mods="$(adx_profile_modules "${1:-default}")"   # a bad profile ends here with exit 1
+  for m in $mods; do
+    printf '%-20s %s\n' "$m" "$(adx_module_changes "$m")"
+  done
+}
+
+# Before installing: list what the modules still to install will change, so nothing is a surprise.
+# Asks on a terminal unless --yes / ADX_YES=1; returns 1 if the user declines.
+_adx_up_notice() {
+  local profile="$1" yes="$2" m pending="" line answer
+  for m in $(adx_profile_modules "$profile"); do
+    [ -f "$ADX_ROOT/modules/$m/module.sh" ] || continue
+    if ! adx_run_module "$m" status >/dev/null 2>&1 </dev/null; then pending="$pending $m"; fi
+  done
+  if [ -z "$pending" ]; then return 0; fi
+  echo "adx up ($profile) will install:$pending"
+  echo "Changes on your system (no root; undo with: adx <module> remove, where a module has it):"
+  for m in $pending; do
+    line="$(printf '  %-19s %s' "$m" "$(adx_module_changes "$m")")"
+    echo "$line"; adx_logfile INFO "up notice: $line"
+  done
+  echo "Full list of paths: docs/environment.md. Review any time: adx changes $profile"
+  if [ "$yes" = 1 ] || [ ! -t 0 ]; then return 0; fi
+  read -r -p "Continue? [Y/n] " answer || answer=n
+  case "$answer" in [nN]*) adx_log "adx up cancelled by the user; nothing changed"; return 1 ;; esac
+}
+
 adx_cmd_up() {
-  local profile="${1:-default}" file m
+  local profile="" yes="${ADX_YES:-0}" file m a opts=1
+  for a in "$@"; do
+    if [ "$opts" = 1 ]; then
+      case "$a" in
+        -y|--yes) yes=1; continue ;;
+        --) opts=0; continue ;;
+        -*) adx_die "unknown option $a (adx up [--yes] [profile])" ;;
+      esac
+    fi
+    [ -z "$profile" ] || adx_die "one profile at a time (got '$profile' and '$a')"
+    profile="$a"
+  done
+  profile="${profile:-default}"
   file="$ADX_ROOT/profiles/$profile.profile"
   [ -f "$file" ] || adx_die "no profile '$profile' (see profiles/)"
+  # Declined: exit code 2, so scripts can tell "cancelled" from "done".
+  _adx_up_notice "$profile" "$yes" || return 2
   adx_log "profile: $profile"
   local failed=""
   for m in $(sed 's/#.*//' "$file"); do
@@ -146,6 +201,7 @@ case "${1:-}" in
   list)   adx_cmd_list ;;
   doctor) shift; adx_cmd_doctor "$@" ;;
   up)     shift; adx_cmd_up "$@" ;;
+  changes) shift; adx_cmd_changes "$@" ;;
   env)    adx_cmd_env ;;
   logs)   shift; adx_cmd_logs "$@" ;;
   check)  shift; . "$ADX_ROOT/lib/check.sh"; adx_cmd_check "$@" ;;

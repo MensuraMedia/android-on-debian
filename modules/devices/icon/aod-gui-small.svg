@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- aod-gui at 16-24 px (tools/render-icons.sh uses it for those sizes): no captions, bigger phones -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#7a5af5"/>
+  <rect x="24" y="52" width="64" height="152" rx="14" fill="#ffffff"/>
+  <rect x="34" y="66" width="44" height="124" rx="5" fill="#4f6bed"/>
+  <rect x="96" y="52" width="64" height="152" rx="14" fill="#ffffff"/>
+  <rect x="106" y="66" width="44" height="124" rx="5" fill="#ffc867"/>
+  <rect x="168" y="52" width="64" height="152" rx="14" fill="#ffffff"/>
+  <rect x="178" y="66" width="44" height="124" rx="5" fill="#4cc088"/>
+</svg>

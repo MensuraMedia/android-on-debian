@@ -1,4 +1,4 @@
-# Handoff — updated 2026-11-10 (v0.2.0 released; adx console; offline phones, per-phone logcat; app pipeline; app dev & release requirements; app library design; framework change process; emulator multi-display requested)
+# Handoff — updated 2026-11-24 (installer notice + `adx changes`, Android Studio in `adx up`, own menu icons; second machine provisioned) — earlier: 2026-11-10 (v0.2.0 released; adx console; offline phones, per-phone logcat; app pipeline; app dev & release requirements; app library design; framework change process; emulator multi-display requested)
 
 State of the framework for whoever (human or agent) picks it up next.
 History of every installation problem: [docs/install-issues.md](docs/install-issues.md).
@@ -28,8 +28,34 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 | Per-phone logcat | Every start saves `~/.local/state/adx/logcat-NAME.log` (previous starts `.1`…`.5`, `ADX_LOG_KEEP`): `adx logs logcat`, `aodm logs --image NAME --logcat`, console **Logcat** (run picker, filter). Verified on both start paths |
 | Security | Posture measured and written up in [docs/security.md](docs/security.md) (2026-11-09): no inbound path from the internet (NAT, loopback-only ports, ufw on); test-device weaknesses accepted by decision; one open finding in LinSmartPhone (separate repo, not fixed here) |
 | Desktop window | `aod-gui` (menu: Phone Images; or run `aod-gui`): live thumbnail per phone, Start / Stop… / Save / Clone… through `aodm` (no `--yes`: anything that would ask is refused). Seen working against three running phones; reviewed (code: 15, deployment: 10 findings). Logs: `grep 'gui:' ~/.local/state/adx/adx.log` |
+| Installer (2026-11-24) | `adx up [--yes] [profile]` lists what each pending module changes (`MOD_CHANGES`, all 18 modules), logs it, asks `Continue? [Y/n]` on a terminal (declined: exit 2); `adx changes [profile]`. Default profile now ends with `studio` (Android Studio 2026.2.2.10, SHA-256 + build pinned). Guide: [docs/installer.md](docs/installer.md). Verified on the second machine (full `adx up`, prompt in a pty sandbox); two adversarial reviews, all findings fixed |
+| Menu icons (2026-11-24) | Own icons for Android Emulator (`adx-emulator`) and Phone Images (`aod-gui`), shared `adx_icon_*` helpers with install records (`~/.local/state/adx/icons/`); user's own icons never replaced or removed |
+| Branch | `feat/installer-notice-icons-studio` pushed to `origin` (2026-11-24, not merged): installer notice, `studio` installer, menu icons, `adx emulator status` fix, docs. Open a PR / merge into `main` when reviewed |
 | Push | `main` pushed to `MensuraMedia/android-on-debian` (last: `14cfa9a`, 2026-11-10; local `main` pulled to it). Since 0.2.0: `a46c1be` app pipeline + offline phones + per-phone logcat + app dev/release docs, `360d7cb` console APK identity fix, `14cfa9a` app-library design + framework change process + emulator multi-display plan. Working tree clean. `feat/aodm` merged (PR #1, `4b5f242`) and can be deleted on GitHub |
 | Repos | `MensuraMedia/android-on-debian` (public, pushed). `LinearGenetics/android-on-debian` (public, empty): the `MensuraMedia` account has read-only access, so it is not pushed yet |
+
+## Second machine (Mint, 12 GiB RAM, 2026-11-24)
+
+- Fresh clone at `~/projects/android-on-debian`. `./adx up` (default profile,
+  now incl. `studio`) ran on 2026-11-24 and finished with exit 0; `adx list`
+  all ok, `adx doctor` exit 0. AVD `adx_api37` created fresh (no snapshot issue
+  here yet). Menu entries: adx console, Android Emulator, Phone Images, with
+  the new icons. Console started at http://127.0.0.2:8766.
+- `~/.bashrc` block, `~/.claude/CLAUDE.md` block + agents and the mobile-mcp
+  registration were installed by that run (owner approved); restart Claude Code
+  to load mobile-mcp.
+- Session operations log: `~/.local/state/adx/claude-ops-20261124.log`
+  (devices build output: `claude-devices-build-20261124.log`).
+- Menu icons, `MOD_CHANGES` + `adx up` notice/`adx changes` and the
+  `studio` installer are committed on branch `feat/installer-notice-icons-studio` (pushed, not merged).
+- Test sandboxes were left in place (owner: no deletes), incl. a git worktree
+  of `998f332` under the session scratchpad: `git worktree prune` once that
+  folder is gone.
+- Both changes reviewed adversarially (icons: 6 findings, installer: 9
+  findings), all fixed; `adx check` passes except 12 pre-existing
+  "unknown command: adx apk / adx library" failures (docs/app-library.md, a
+  design for unbuilt commands; same count on 998f332). Fix: add `apk library`
+  to `planned` in `lib/check.sh` when the owner agrees.
 
 ## This machine (hybrid-GPU laptop)
 
@@ -54,6 +80,16 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 - Emulator GPS location was left at Paris (48.85, 2.35) by a console test.
 
 ## Known issues
+
+- Menu icons (2026-11-24, uncommitted, staged): the `adx-emulator`/`aod-gui`
+  PNGs were rendered with headless Brave + Pillow (librsvg2-bin was not
+  installed; 16–24 px from the `-small.svg` drawings);
+  `tools/render-icons.sh` (rsvg-convert) regenerates all three icon sets.
+  Tested in sandboxed XDG dirs only (install, reinstall, user's own icon kept,
+  `ADX_FORCE`, remove, legacy console icons, emulator status); `adx devices
+  install` (Rust build) and the real Cinnamon menu were not exercised. The
+  emulator's own window has no `StartupWMClass` match yet (its window class is
+  unverified), so the panel may show the emulator's built-in icon, not `adx-emulator`.
 
 - **[OPEN, major, 2026-11-10] No phone is emulated — quick-boot snapshot load
   fails.** `adx_api37` will not come up: `aodm health` shows it `stopped`,
@@ -245,6 +281,18 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
 
 ## Decisions
 
+- 2026-11-24: owner: "install all modules and incorporate them into the
+  general installer" → `studio` joined the default profile (last, so the
+  toolchain is usable first) with a real, SHA-256-pinned installer; `adx
+  doctor` now fails until it's installed. Owner: "include this in the
+  installer so users are familiar with these adjustments" → `adx up` lists
+  every change to the user's system before installing and asks once.
+- 2026-11-24: owner asked for dedicated icons for the Android Emulator and
+  Phone Images menu entries (supersedes the 2026-11-09 "generic phone icon"
+  note below).
+- 2026-11-24: owner working rule: no deletes during operations and tests
+  (create new folders/copies instead), and log every operation.
+
 - 2026-11-10: the console is an AI (Claude)-integrated environment, not an
   IDE: Claude Code plans, designs and codes; the environment assembles,
   checks, tests and deploys to the emulator for review and iteration.
@@ -260,8 +308,10 @@ Feature status (shipped / pending / future): [ROADMAP.md](ROADMAP.md).
   log in `ADX_LOG_DIR` and rotates the same way.
 
 - 2026-11-09: the adx console (web GUI) is the OS/phone image manager the
-  owner uses day to day; it owns the new app icon. `aod-gui` keeps its
-  generic `phone` icon. LineageOS/phone-conversion features stay in
+  owner uses day to day; it owns the new app icon. (Superseded 2026-11-24:
+  on the owner's request the emulator and `aod-gui` menu entries got their own
+  icons too, `adx-emulator` (green, phone with play) and `aod-gui` (violet,
+  row of phone cards).) LineageOS/phone-conversion features stay in
   LinSmartPhone (`~/projects/android-conversion`) and are not part of this repo.
 - 2026-11-09: security: document the posture; don't change anything already
   sufficient. The LinSmartPhone token exposure is recorded in
